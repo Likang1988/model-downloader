@@ -1,4 +1,5 @@
 import os
+import sys
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 )
@@ -13,6 +14,15 @@ from .downloader import RepoProvider, FileInfo
 from .file_select_dialog import FileTreeDialog
 from .download_queue import DownloadQueueWidget
 from .download_log import LogWidget
+
+
+def resource_path(relative_path: str) -> str:
+    """获取资源文件的绝对路径，兼容开发环境和 PyInstaller 打包后的运行环境。"""
+    try:
+        base_path = sys._MEIPASS  # PyInstaller 单文件模式
+    except AttributeError:
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 开发 / --onedir 模式
+    return os.path.join(base_path, relative_path)
 
 
 class RepoPage(QWidget):
@@ -201,7 +211,7 @@ class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("大模型下载工具")
-        icon_path = os.path.join(os.path.dirname(__file__), "icon", "icon.ico")
+        icon_path = resource_path(os.path.join("src", "icon", "icon.ico"))
         self.setWindowIcon(QIcon(icon_path))
         self.resize(1100, 750)
 
@@ -224,12 +234,12 @@ class MainWindow(FluentWindow):
         
         self.addSubInterface(
             self.ms_page,
-            QIcon("src/icon/modelscope.svg"),
+            QIcon(resource_path("src/icon/modelscope.svg")),
             "ModelScope"
         )
         self.addSubInterface(
             self.hf_page,
-            QIcon("src/icon/huggingface.svg"),
+            QIcon(resource_path("src/icon/huggingface.svg")),
             "Hugging Face"
         )
 

@@ -30,6 +30,9 @@ DATA_DIRS = [
 # 需要随程序一起分发的文件：(源文件, 目标目录)
 DATA_FILES = []
 
+# 输出目录：用户目录下的 builds 文件夹
+OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "builds")
+
 # PyInstaller 可能无法自动发现的隐式导入
 HIDDEN_IMPORTS = [
     "PySide6",
@@ -96,12 +99,18 @@ def check_pyinstaller():
 
 def clean_build():
     """清理之前的构建产物。"""
-    dirs_to_clean = ["build", "dist"]
+    dirs_to_clean = ["build", OUTPUT_DIR]
 
     for d in dirs_to_clean:
         if os.path.exists(d):
             print(f"  删除 {d}/...")
             shutil.rmtree(d)
+
+    # 清理 PyInstaller 临时目录
+    pyi_build = os.path.join(OUTPUT_DIR, "build")
+    if os.path.exists(pyi_build):
+        print(f"  删除 {pyi_build}/...")
+        shutil.rmtree(pyi_build)
 
     # 清理所有 __pycache__
     for root, dirs, _ in os.walk("."):
@@ -132,12 +141,17 @@ def build_app(system, arch, onefile):
     sep = get_platform_separator()
     icon_path = "src/icon/icon.ico"
 
+    # 确保输出目录存在
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
     # 基础命令
     cmd = [
         "pyinstaller",
         "--clean",
         "--noconfirm",
         f"--name={APP_NAME}",
+        f"--distpath={OUTPUT_DIR}",
+        f"--workpath={os.path.join(OUTPUT_DIR, 'build')}",
     ]
 
     if onefile:
@@ -216,26 +230,26 @@ def build_app(system, arch, onefile):
     subprocess.run(cmd, check=True)
 
     # ========== 验证打包结果 ==========
-    output_path = os.path.join("dist", APP_NAME)
+    output_path = os.path.join(OUTPUT_DIR, APP_NAME)
     if onefile:
         if system == "windows":
-            exe_path = os.path.join("dist", f"{APP_NAME}.exe")
+            exe_path = os.path.join(OUTPUT_DIR, f"{APP_NAME}.exe")
             success = os.path.exists(exe_path)
             if success:
                 size_mb = os.path.getsize(exe_path) / (1024 * 1024)
-                print(f"\n[✓] 打包成功！单文件: dist/{APP_NAME}.exe ({size_mb:.2f} MB)")
+                print(f"\n[✓] 打包成功！单文件: {exe_path} ({size_mb:.2f} MB)")
         elif system == "darwin":
-            # --onefile on macOS produces a .app in dist
-            app_path = os.path.join("dist", f"{APP_NAME}.app")
+            # --onefile on macOS produces a .app
+            app_path = os.path.join(OUTPUT_DIR, f"{APP_NAME}.app")
             success = os.path.exists(app_path)
             if success:
-                print(f"\n[✓] 打包成功！输出: dist/{APP_NAME}.app")
+                print(f"\n[✓] 打包成功！输出: {app_path}")
         else:
-            binary = os.path.join("dist", APP_NAME)
+            binary = os.path.join(OUTPUT_DIR, APP_NAME)
             success = os.path.exists(binary)
             if success:
                 size_mb = os.path.getsize(binary) / (1024 * 1024)
-                print(f"\n[✓] 打包成功！输出: dist/{APP_NAME} ({size_mb:.2f} MB)")
+                print(f"\n[✓] 打包成功！输出: {binary} ({size_mb:.2f} MB)")
     else:
         success = os.path.isdir(output_path)
         if success:
@@ -245,7 +259,7 @@ def build_app(system, arch, onefile):
                     fp = os.path.join(dirpath, f)
                     total_size += os.path.getsize(fp)
             size_mb = total_size / (1024 * 1024)
-            print(f"\n[✓] 打包成功！目录: dist/{APP_NAME}/ ({size_mb:.2f} MB)")
+            print(f"\n[✓] 打包成功！目录: {output_path}/ ({size_mb:.2f} MB)")
 
     return success
 
@@ -354,13 +368,13 @@ def main():
         print(f"  ✓✓✓  打包完成！  ✓✓✓")
         if args.onefile:
             if target == "windows":
-                print(f"  输出: dist/{APP_NAME}.exe")
+                print(f"  输出: {os.path.join(OUTPUT_DIR, APP_NAME)}.exe")
             elif target == "macos":
-                print(f"  输出: dist/{APP_NAME}.app")
+                print(f"  输出: {os.path.join(OUTPUT_DIR, APP_NAME)}.app")
             else:
-                print(f"  输出: dist/{APP_NAME}")
+                print(f"  输出: {os.path.join(OUTPUT_DIR, APP_NAME)}")
         else:
-            print(f"  输出: dist/{APP_NAME}/")
+            print(f"  输出: {os.path.join(OUTPUT_DIR, APP_NAME)}/")
         print(f"{'=' * 55}")
     else:
         print(f"\n[Error] 打包失败，输出未生成！")
