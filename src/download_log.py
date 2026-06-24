@@ -23,8 +23,8 @@ class LogWidget(QWidget):
             QTextEdit {
                 border: 1px solid #e0e0e0;
                 border-radius: 6px;
-                background-color: #1e1e1e;
-                color: #d4d4d4;
+                background-color: #ffffff;
+                color: #333333;
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 12px;
                 padding: 8px;

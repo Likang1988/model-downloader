@@ -10,18 +10,20 @@ from qfluentwidgets import (
     SearchLineEdit, ComboBox, SwitchButton, PrimaryPushButton,
     PushButton, InfoBar, InfoBarPosition
 )
+from qfluentwidgets.common.config import qconfig, Theme
 from .downloader import RepoProvider, FileInfo
 from .file_select_dialog import FileTreeDialog
 from .download_queue import DownloadQueueWidget
 from .download_log import LogWidget
+from .config import cfg, Language
 
 
 def resource_path(relative_path: str) -> str:
     """获取资源文件的绝对路径，兼容开发环境和 PyInstaller 打包后的运行环境。"""
     try:
-        base_path = sys._MEIPASS  # PyInstaller 单文件模式
+        base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 开发 / --onedir 模式
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
 
@@ -143,10 +145,12 @@ class RepoPage(QWidget):
 
 
 class SettingsPage(QWidget):
-    """设置页面"""
-    def __init__(self, mirror_switch=None, parent=None):
+    """设置页面 — 镜像、主题、语言"""
+    def __init__(self, mirror_switch=None, app=None, translator=None, parent=None):
         super().__init__(parent)
         self.mirror_switch = mirror_switch or SwitchButton()
+        self._app = app
+        self._translator = translator
         self.init_ui()
 
     def init_ui(self):
@@ -158,34 +162,77 @@ class SettingsPage(QWidget):
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(title)
 
-        # 镜像设置卡片
-        mirror_card = QFrame()
-        mirror_card.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 8px;
-                padding: 20px;
-            }
-        """)
+        # ---- 卡片容器（统一去除白色背景，交由主题控制） ----
+        def make_card():
+            card = QFrame()
+            card.setObjectName("settings_card")
+            return card
+
+        # ======== 外观卡片：主题 + 语言 ========
+        appearance_card = make_card()
+        appearance_layout = QVBoxLayout(appearance_card)
+        appearance_layout.setSpacing(12)
+
+        appearance_title = QLabel("外观")
+        appearance_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        appearance_layout.addWidget(appearance_title)
+
+        # -- 主题 --
+        theme_row = QHBoxLayout()
+        theme_label = QLabel("主题模式")
+        theme_label.setStyleSheet("font-size: 14px;")
+        self.theme_combo = ComboBox()
+        self.theme_combo.addItem("浅色", "Light")
+        self.theme_combo.addItem("深色", "Dark")
+        self.theme_combo.addItem("跟随系统", "Auto")
+        # 设置当前值
+        current_theme = qconfig.get(cfg.themeMode)
+        theme_map = {Theme.LIGHT: "Light", Theme.DARK: "Dark", Theme.AUTO: "Auto"}
+        self.theme_combo.setCurrentIndex(
+            list(theme_map.values()).index(theme_map.get(current_theme, "Light"))
+        )
+        self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
+        theme_row.addWidget(theme_label)
+        theme_row.addStretch()
+        theme_row.addWidget(self.theme_combo)
+        appearance_layout.addLayout(theme_row)
+
+        # -- 语言 --
+        lang_row = QHBoxLayout()
+        lang_label = QLabel("界面语言")
+        lang_label.setStyleSheet("font-size: 14px;")
+        self.lang_combo = ComboBox()
+        current_lang = cfg.get(cfg.language)
+        for display, code in Language.options():
+            self.lang_combo.addItem(display, code)
+            if code == current_lang:
+                self.lang_combo.setCurrentIndex(self.lang_combo.count() - 1)
+        self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
+        lang_row.addWidget(lang_label)
+        lang_row.addStretch()
+        lang_row.addWidget(self.lang_combo)
+        appearance_layout.addLayout(lang_row)
+
+        layout.addWidget(appearance_card)
+
+        # ======== 下载卡片：镜像开关 ========
+        mirror_card = make_card()
         mirror_layout = QHBoxLayout(mirror_card)
 
         mirror_label = QLabel("使用 HF-Mirror 镜像（国内加速访问 Hugging Face）")
         mirror_label.setStyleSheet("font-size: 14px;")
+
+        # 从配置恢复镜像开关状态
+        self.mirror_switch.setChecked(cfg.get(cfg.mirror_enabled))
+        self.mirror_switch.checkedChanged.connect(self._on_mirror_changed)
 
         mirror_layout.addWidget(mirror_label)
         mirror_layout.addStretch()
         mirror_layout.addWidget(self.mirror_switch)
         layout.addWidget(mirror_card)
 
-        # 关于卡片
-        about_card = QFrame()
-        about_card.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border-radius: 8px;
-                padding: 20px;
-            }
-        """)
+        # ======== 关于卡片 ========
+        about_card = make_card()
         about_layout = QVBoxLayout(about_card)
 
         about_title = QLabel("关于")
@@ -206,23 +253,51 @@ class SettingsPage(QWidget):
 
         layout.addStretch()
 
+    # ---- 事件处理 ----
+
+    def _on_theme_changed(self, index):
+        theme_map = {"Light": Theme.LIGHT, "Dark": Theme.DARK, "Auto": Theme.AUTO}
+        text = self.theme_combo.itemData(index)
+        new_theme = theme_map.get(text, Theme.LIGHT)
+        qconfig.set(cfg.themeMode, new_theme)
+
+    def _on_language_changed(self, index):
+        code = self.lang_combo.itemData(index)
+        if code == cfg.get(cfg.language):
+            return
+        cfg.set(cfg.language, code)
+        # 提示重启生效
+        InfoBar.success(
+            title="语言已更改",
+            content="重启应用后生效",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP_RIGHT,
+            duration=5000,
+            parent=self,
+        )
+
+    def _on_mirror_changed(self, checked):
+        cfg.set(cfg.mirror_enabled, checked)
+
 
 class MainWindow(FluentWindow):
-    def __init__(self):
+    def __init__(self, translator=None):
         super().__init__()
+        self._translator = translator
         self.setWindowTitle("大模型下载工具")
         icon_path = resource_path(os.path.join("src", "icon", "icon.ico"))
         self.setWindowIcon(QIcon(icon_path))
         self.resize(1100, 750)
 
-        # 共享的镜像开关
+        # 镜像开关
         self.mirror_switch = SwitchButton()
-        self.mirror_switch.setChecked(True)
+        self.mirror_switch.setChecked(cfg.get(cfg.mirror_enabled))
 
         # 创建页面
         self.hf_page = RepoPage("huggingface", self.mirror_switch)
         self.ms_page = RepoPage("modelscope", self.mirror_switch)
-        self.settings_page = SettingsPage(self.mirror_switch)
+        self.settings_page = SettingsPage(self.mirror_switch, translator=translator)
 
         # 初始化导航
         self.initNavigation()
