@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtCore import Qt, QDateTime
+from qfluentwidgets import SubtitleLabel, TextEdit
 
 
 class LogWidget(QWidget):
@@ -13,23 +14,11 @@ class LogWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        title = QLabel("下载日志")
-        title.setStyleSheet("font-size: 13px; font-weight: bold;")
+        title = SubtitleLabel("下载日志")
         layout.addWidget(title)
 
-        self.log_area = QTextEdit()
+        self.log_area = TextEdit()
         self.log_area.setReadOnly(True)
-        self.log_area.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                background-color: #ffffff;
-                color: #333333;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 12px;
-                padding: 8px;
-            }
-        """)
         layout.addWidget(self.log_area, 1)
 
     def log(self, message: str):

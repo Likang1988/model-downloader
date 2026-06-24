@@ -8,7 +8,8 @@ from PySide6.QtGui import QIcon
 from qfluentwidgets import (
     FluentWindow, FluentIcon as FIF, NavigationItemPosition,
     SearchLineEdit, ComboBox, SwitchButton, PrimaryPushButton,
-    PushButton, InfoBar, InfoBarPosition
+    PushButton, InfoBar, InfoBarPosition, setTheme, Theme,
+    OptionsSettingCard, SettingCardGroup, BodyLabel, TitleLabel, CaptionLabel, SubtitleLabel
 )
 from qfluentwidgets.common.config import qconfig, Theme
 from .downloader import RepoProvider, FileInfo
@@ -45,8 +46,7 @@ class RepoPage(QWidget):
         layout.setSpacing(8)
 
         # ========== 顶部：标题 + 搜索区域 ==========
-        title = QLabel(f"{'Hugging Face' if self.provider == 'huggingface' else 'ModelScope'}")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title = TitleLabel(f"{'Hugging Face' if self.provider == 'huggingface' else 'ModelScope'}")
         layout.addWidget(title)
 
         # 搜索行：repo ID 输入 + 获取文件按钮
@@ -158,49 +158,32 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        title = QLabel("设置")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        title = TitleLabel("设置")
         layout.addWidget(title)
 
-        # ---- 卡片容器（统一去除白色背景，交由主题控制） ----
-        def make_card():
-            card = QFrame()
-            card.setObjectName("settings_card")
-            return card
-
         # ======== 外观卡片：主题 + 语言 ========
-        appearance_card = make_card()
+        appearance_card = QFrame()
+        appearance_card.setObjectName("settings_card")
         appearance_layout = QVBoxLayout(appearance_card)
         appearance_layout.setSpacing(12)
 
-        appearance_title = QLabel("外观")
-        appearance_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        appearance_title = SubtitleLabel("外观")
         appearance_layout.addWidget(appearance_title)
 
-        # -- 主题 --
-        theme_row = QHBoxLayout()
-        theme_label = QLabel("主题模式")
-        theme_label.setStyleSheet("font-size: 14px;")
-        self.theme_combo = ComboBox()
-        self.theme_combo.addItem("浅色", "Light")
-        self.theme_combo.addItem("深色", "Dark")
-        self.theme_combo.addItem("跟随系统", "Auto")
-        # 设置当前值
-        current_theme = qconfig.get(cfg.themeMode)
-        theme_map = {Theme.LIGHT: "Light", Theme.DARK: "Dark", Theme.AUTO: "Auto"}
-        self.theme_combo.setCurrentIndex(
-            list(theme_map.values()).index(theme_map.get(current_theme, "Light"))
+        # -- 主题（使用官方示例的 OptionsSettingCard）--
+        self.themeCard = OptionsSettingCard(
+            cfg.themeMode,
+            FIF.BRUSH,
+            "主题模式",
+            "更改应用的外观",
+            texts=["浅色", "深色", "跟随系统"],
+            parent=self
         )
-        self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
-        theme_row.addWidget(theme_label)
-        theme_row.addStretch()
-        theme_row.addWidget(self.theme_combo)
-        appearance_layout.addLayout(theme_row)
+        appearance_layout.addWidget(self.themeCard)
 
         # -- 语言 --
         lang_row = QHBoxLayout()
-        lang_label = QLabel("界面语言")
-        lang_label.setStyleSheet("font-size: 14px;")
+        lang_label = BodyLabel("界面语言")
         self.lang_combo = ComboBox()
         current_lang = cfg.get(cfg.language)
         for display, code in Language.options():
@@ -216,11 +199,11 @@ class SettingsPage(QWidget):
         layout.addWidget(appearance_card)
 
         # ======== 下载卡片：镜像开关 ========
-        mirror_card = make_card()
+        mirror_card = QFrame()
+        mirror_card.setObjectName("settings_card")
         mirror_layout = QHBoxLayout(mirror_card)
 
-        mirror_label = QLabel("使用 HF-Mirror 镜像（国内加速访问 Hugging Face）")
-        mirror_label.setStyleSheet("font-size: 14px;")
+        mirror_label = BodyLabel("使用 HF-Mirror 镜像（国内加速访问 Hugging Face）")
 
         # 从配置恢复镜像开关状态
         self.mirror_switch.setChecked(cfg.get(cfg.mirror_enabled))
@@ -232,20 +215,19 @@ class SettingsPage(QWidget):
         layout.addWidget(mirror_card)
 
         # ======== 关于卡片 ========
-        about_card = make_card()
+        about_card = QFrame()
+        about_card.setObjectName("settings_card")
         about_layout = QVBoxLayout(about_card)
 
-        about_title = QLabel("关于")
-        about_title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        about_title = SubtitleLabel("关于")
 
-        about_text = QLabel(
+        about_text = BodyLabel(
             "大模型下载工具 v1.0\n\n"
             "支持从 Hugging Face 和 ModelScope 下载模型与数据集。\n"
             "可自主选择需要下载的文件，支持断点续传、暂停/恢复。\n\n"
             "提示：国内用户建议开启 HF-Mirror 镜像以加速下载。"
         )
         about_text.setWordWrap(True)
-        about_text.setStyleSheet("color: #555; line-height: 1.6;")
 
         about_layout.addWidget(about_title)
         about_layout.addWidget(about_text)
@@ -254,12 +236,6 @@ class SettingsPage(QWidget):
         layout.addStretch()
 
     # ---- 事件处理 ----
-
-    def _on_theme_changed(self, index):
-        theme_map = {"Light": Theme.LIGHT, "Dark": Theme.DARK, "Auto": Theme.AUTO}
-        text = self.theme_combo.itemData(index)
-        new_theme = theme_map.get(text, Theme.LIGHT)
-        qconfig.set(cfg.themeMode, new_theme)
 
     def _on_language_changed(self, index):
         code = self.lang_combo.itemData(index)
@@ -301,6 +277,11 @@ class MainWindow(FluentWindow):
 
         # 初始化导航
         self.initNavigation()
+        
+        # 监听主题变化（按照官方示例的方式）
+        cfg.themeChanged.connect(setTheme)
+        print(f"DEBUG: cfg.themeChanged 信号已连接")
+        print(f"DEBUG: cfg.themeMode is cfg._cfg.themeMode: {cfg.themeMode is cfg._cfg.themeMode}")
 
     def initNavigation(self):
         self.ms_page.setObjectName("ms_page")

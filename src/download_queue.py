@@ -4,13 +4,13 @@ import datetime
 from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QLabel, QPushButton, QHeaderView, QAbstractItemView,
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidgetItem,
+    QPushButton, QHeaderView, QAbstractItemView,
     QStyledItemDelegate, QStyleOptionViewItem, QProgressBar
 )
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QSize
 from PySide6.QtGui import QPainter, QColor, QFont, QMouseEvent
-from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel
+from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel
 from qfluentwidgets import FluentIcon as FIF
 from .downloader import FileInfo, DownloadTask
 
@@ -117,8 +117,8 @@ class ProgressDelegate(QStyledItemDelegate):
         super().paint(painter, option, index)
 
 
-class ClickableLabel(QLabel):
-    """可点击的 QLabel"""
+class ClickableLabel(BodyLabel):
+    """可点击的 BodyLabel"""
     clicked = Signal()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -150,16 +150,12 @@ class DownloadQueueWidget(QWidget):
         header_bar = QHBoxLayout()
         header_bar.setSpacing(8)
 
-        title = QLabel("下载队列")
-        title.setStyleSheet("font-size: 15px; font-weight: bold;")
-        self.count_label = QLabel("共 0 项")
-        self.count_label.setStyleSheet("color: #888; font-size: 12px;")
+        title = SubtitleLabel("下载队列")
+        self.count_label = CaptionLabel("共 0 项")
 
         # 保存路径
-        path_prefix = QLabel("保存路径:")
-        path_prefix.setStyleSheet("font-size: 14px; color: #555;")
+        path_prefix = BodyLabel("保存路径:")
         self.path_edit = ClickableLabel(self._save_path)
-        self.path_edit.setStyleSheet("color: #888; font-size: 12px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 3px;")
         self.path_edit.setMinimumWidth(120)
         self.path_edit.setMaximumWidth(200)
         self.path_edit.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -226,12 +222,13 @@ class DownloadQueueWidget(QWidget):
         layout.addLayout(header_bar)
 
         # ====== 表格 ======
-        self.table = QTableWidget()
+        self.table = TableWidget()
+        self.table.setBorderRadius(8)
+        self.table.setBorderVisible(True)
         self.table.setColumnCount(len(COLUMNS))
         self.table.setHorizontalHeaderLabels(COLUMNS)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setItemDelegateForColumn(COL_PROGRESS, ProgressDelegate(self.table))
@@ -258,32 +255,6 @@ class DownloadQueueWidget(QWidget):
         self.table.setColumnWidth(COL_TOTAL_SIZE, 85)
         self.table.setColumnWidth(COL_SPEED, 85)
         self.table.setColumnWidth(COL_ADD_TIME, 120)
-
-        self.table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                background-color: white;
-                font-size: 12px;
-                gridline-color: #f0f0f0;
-            }
-            QTableWidget::item {
-                padding: 4px 6px;
-            }
-            QTableWidget::item:selected {
-                background-color: #e3f2fd;
-                color: #000;
-            }
-            QHeaderView::section {
-                background-color: #fafafa;
-                border: none;
-                border-bottom: 1px solid #e0e0e0;
-                padding: 6px;
-                font-weight: bold;
-                font-size: 12px;
-                color: #555;
-            }
-        """)
 
         layout.addWidget(self.table, 1)
 

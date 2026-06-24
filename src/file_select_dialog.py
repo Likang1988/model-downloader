@@ -1,11 +1,11 @@
 import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QCheckBox, QLabel, QPushButton, QHeaderView, QWidget, QAbstractItemView
+    QCheckBox, QPushButton, QHeaderView, QWidget, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
-from qfluentwidgets import PrimaryPushButton, PushButton
+from qfluentwidgets import PrimaryPushButton, PushButton, BodyLabel, CaptionLabel
 from .downloader import FileInfo
 
 
@@ -39,8 +39,7 @@ class FileTreeDialog(QDialog):
 
         # 顶部信息栏
         info_layout = QHBoxLayout()
-        self.repo_label = QLabel(f"共 {len(self.files)} 个文件")
-        self.repo_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        self.repo_label = BodyLabel(f"共 {len(self.files)} 个文件")
         info_layout.addWidget(self.repo_label)
         info_layout.addStretch()
         layout.addLayout(info_layout)
@@ -54,10 +53,8 @@ class FileTreeDialog(QDialog):
         self.collapse_btn = QPushButton("折叠全部")
         self.collapse_btn.clicked.connect(self.collapse_all)
 
-        self.selection_label = QLabel("已选择 0 项")
-        self.selection_label.setStyleSheet("color: #666;")
-        self.size_label = QLabel("总大小: 0 B")
-        self.size_label.setStyleSheet("color: #666;")
+        self.selection_label = CaptionLabel("已选择 0 项")
+        self.size_label = CaptionLabel("总大小: 0 B")
 
         toolbar.addWidget(self.select_all_cb)
         toolbar.addWidget(self.expand_btn)

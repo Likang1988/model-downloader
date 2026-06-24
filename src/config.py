@@ -8,6 +8,8 @@ from qfluentwidgets.common.config import (
     OptionsConfigItem,
     OptionsValidator,
     BoolValidator,
+    qconfig,
+    Theme,
 )
 
 
@@ -68,5 +70,9 @@ def get_config_path():
 
 # 全局唯一配置实例
 cfg = AppConfig()
-cfg.file = get_config_path()
-cfg.load()
+
+# 设置默认主题（QConfig 内置的 themeMode 属性）
+cfg.themeMode.value = Theme.AUTO
+
+# 加载配置（使用 qconfig.load 确保内置配置项如 themeMode 也被正确加载）
+qconfig.load(get_config_path(), cfg)

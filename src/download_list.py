@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
-    QListWidgetItem, QLabel
+    QListWidgetItem
 )
 from PySide6.QtCore import Qt, QThread
 from qfluentwidgets import (
-    ProgressBar, PushButton, ToolButton
+    ProgressBar, PushButton, ToolButton, BodyLabel, CaptionLabel
 )
 from .downloader import FileInfo, DownloadTask
 
@@ -24,9 +24,8 @@ class DownloadItemWidget(QWidget):
         layout.setSpacing(8)
 
         header_layout = QHBoxLayout()
-        self.name_label = QLabel(self.file_info.name)
-        self.name_label.setStyleSheet("font-weight: bold;")
-        self.size_label = QLabel(self.format_size(self.file_info.size))
+        self.name_label = BodyLabel(self.file_info.name)
+        self.size_label = CaptionLabel(self.format_size(self.file_info.size))
 
         self.cancel_btn = ToolButton()
         self.cancel_btn.setText("取消")
@@ -42,7 +41,7 @@ class DownloadItemWidget(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
 
-        self.status_label = QLabel("等待下载")
+        self.status_label = CaptionLabel("等待下载")
 
         layout.addLayout(header_layout)
         layout.addWidget(self.progress_bar)
