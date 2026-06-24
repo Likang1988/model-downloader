@@ -55,6 +55,16 @@ class AppConfig(QConfig):
         BoolValidator(),
     )
 
+    # HuggingFace Token（用于访问私有仓库和 gated repo）
+    hf_token = ConfigItem(
+        "Auth", "HuggingFaceToken", "",
+    )
+
+    # ModelScope Token（用于访问私有模型/数据集）
+    ms_token = ConfigItem(
+        "Auth", "ModelScopeToken", "",
+    )
+
 
 def get_config_dir():
     """配置文件存储目录 ~/.model_downloader/"""

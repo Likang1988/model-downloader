@@ -13,6 +13,8 @@ from PySide6.QtGui import QPainter, QColor, QFont, QMouseEvent
 from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel
 from qfluentwidgets import FluentIcon as FIF
 from .downloader import FileInfo, DownloadTask
+from .download_history import history_mgr
+from .i18n import tr
 
 
 def format_size(size: int) -> str:
@@ -150,11 +152,11 @@ class DownloadQueueWidget(QWidget):
         header_bar = QHBoxLayout()
         header_bar.setSpacing(8)
 
-        title = SubtitleLabel("下载队列")
-        self.count_label = CaptionLabel("共 0 项")
+        self.queue_title = SubtitleLabel(tr("下载队列"))
+        self.count_label = CaptionLabel(tr("共 0 项"))
 
         # 保存路径
-        path_prefix = BodyLabel("保存路径:")
+        path_prefix = BodyLabel(tr("保存路径:"))
         self.path_edit = ClickableLabel(self._save_path)
         self.path_edit.setMinimumWidth(120)
         self.path_edit.setMaximumWidth(200)
@@ -167,20 +169,20 @@ class DownloadQueueWidget(QWidget):
         self.browse_path_btn.clicked.connect(self._on_open_path)
 
         # 控制按钮
-        self.start_sel_btn = PushButton(FIF.PLAY, "开始")
+        self.start_sel_btn = PushButton(FIF.PLAY, tr("开始"))
         self.start_sel_btn.setFixedHeight(28)
         self.start_sel_btn.clicked.connect(self.on_start_selected)
 
-        self.pause_sel_btn = PushButton(FIF.PAUSE, "暂停")
+        self.pause_sel_btn = PushButton(FIF.PAUSE, tr("暂停"))
         self.pause_sel_btn.setFixedHeight(28)
         self.pause_sel_btn.clicked.connect(self.on_pause_selected)
         self.pause_sel_btn.setEnabled(False)
 
-        self.remove_sel_btn = PushButton(FIF.CLOSE, "移除")
+        self.remove_sel_btn = PushButton(FIF.CLOSE, tr("移除"))
         self.remove_sel_btn.setFixedHeight(28)
         self.remove_sel_btn.clicked.connect(self.on_remove_selected)
 
-        self.clear_all_btn = PushButton(FIF.BROOM, "清空")
+        self.clear_all_btn = PushButton(FIF.BROOM, tr("清空"))
         self.clear_all_btn.setFixedHeight(28)
         self.clear_all_btn.clicked.connect(self.on_clear_all)
 
@@ -207,7 +209,7 @@ class DownloadQueueWidget(QWidget):
             }
         """)
 
-        header_bar.addWidget(title)
+        header_bar.addWidget(self.queue_title)
         header_bar.addWidget(self.count_label)
         header_bar.addStretch()
         header_bar.addWidget(self.total_progress)
@@ -306,6 +308,18 @@ class DownloadQueueWidget(QWidget):
 
     def set_mirror(self, enabled: bool):
         self._mirror_enabled = enabled
+
+    def retranslateUi(self):
+        self.queue_title.setText(tr("下载队列"))
+        self.count_label.setText(tr("共 0 项").format(self.table.rowCount()))
+        self.start_sel_btn.setText(tr("开始"))
+        self.pause_sel_btn.setText(tr("暂停"))
+        self.remove_sel_btn.setText(tr("移除"))
+        self.clear_all_btn.setText(tr("清空"))
+        col_labels = [tr("序号"), tr("模型ID"), tr("文件名"), tr("来源"),
+                      tr("状态"), tr("进度"), tr("已下载"), tr("总大小"),
+                      tr("速度"), tr("剩余时间")]
+        self.table.setHorizontalHeaderLabels(col_labels)
 
     def _on_browse_path(self):
         """浏览并选择保存路径"""
@@ -554,6 +568,15 @@ class DownloadQueueWidget(QWidget):
         self._cleanup_thread(row)
         self._active_count = max(0, self._active_count - 1)
         self._update_total_progress()
+        # 写入历史记录
+        history_mgr.add_record(
+            file_name=ti.file_info.name,
+            repo_id=ti.file_info.repo_id,
+            provider=ti.file_info.provider,
+            status="下载完成",
+            file_size=ti.downloaded,
+            save_path=ti.save_path or self._save_path,
+        )
         # 自动启动下一个等待任务
         self._start_next_pending()
 
@@ -567,6 +590,15 @@ class DownloadQueueWidget(QWidget):
         self._cleanup_thread(row)
         self._active_count = max(0, self._active_count - 1)
         self._update_total_progress()
+        # 写入历史记录
+        history_mgr.add_record(
+            file_name=ti.file_info.name,
+            repo_id=ti.file_info.repo_id,
+            provider=ti.file_info.provider,
+            status="下载失败",
+            file_size=ti.file_info.size or 0,
+            save_path=ti.save_path or self._save_path,
+        )
         self._start_next_pending()
         self.log_message.emit(f"[{ti.file_info.repo_id}] 下载失败: {ti.file_info.name} - {error}")
 
@@ -579,6 +611,15 @@ class DownloadQueueWidget(QWidget):
         self._set_cell(row, COL_SPEED, "")
         self._cleanup_thread(row)
         self._active_count = max(0, self._active_count - 1)
+        # 写入历史记录
+        history_mgr.add_record(
+            file_name=ti.file_info.name,
+            repo_id=ti.file_info.repo_id,
+            provider=ti.file_info.provider,
+            status="已取消",
+            file_size=ti.file_info.size or 0,
+            save_path=ti.save_path or self._save_path,
+        )
 
     def _on_paused(self, row: int):
         ti = self.tasks.get(row)

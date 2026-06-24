@@ -1,7 +1,7 @@
 import os
 import requests
 import urllib3
-from typing import List, Dict
+from typing import List, Dict, Optional
 from PySide6.QtCore import QObject, Signal, QMutex, QMutexLocker
 
 # 关闭 SSL 警告（用于 modelscope 等有 SSL 兼容问题的站点）
@@ -12,6 +12,22 @@ DEFAULT_HEADERS = {
     "User-Agent": "ModelDownloader/1.0 (Windows; +https://github.com) Python/3.x",
     "Accept": "application/json"
 }
+
+
+def get_auth_headers(provider: str) -> dict:
+    """根据 provider 获取带 Token 认证的请求头（如果有配置的话）"""
+    from .config import cfg
+    headers = dict(DEFAULT_HEADERS)
+    token = ""
+    if provider == "huggingface":
+        token = cfg.get(cfg.hf_token) or ""
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    elif provider == "modelscope":
+        token = cfg.get(cfg.ms_token) or ""
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 class FileInfo:
@@ -65,7 +81,8 @@ class DownloadTask(QObject):
 
         try:
             self.status_changed.emit(self.task_id, "连接中...")
-            response = requests.get(url, stream=True, timeout=30, headers=DEFAULT_HEADERS)
+            headers = get_auth_headers(self.file_info.provider)
+            response = requests.get(url, stream=True, timeout=30, headers=headers)
             response.raise_for_status()
 
             total_size = int(response.headers.get("content-length", 0)) or 0
@@ -142,6 +159,7 @@ class RepoProvider:
     def _try_list_files(provider: str, repo_id: str, repo_type: str, mirror_enabled: bool = False):
         files = []
         debug = []
+        auth_headers = get_auth_headers(provider)
         try:
             if provider == "huggingface":
                 urls_to_try = ["https://hf-mirror.com", "https://huggingface.co"]
@@ -154,7 +172,7 @@ class RepoProvider:
                     for repo_type_path in types:
                         api_url = f"{base_url}/api/{repo_type_path}/{repo_id}/tree/main?recursive=True"
                         try:
-                            resp = requests.get(api_url, timeout=15, headers=DEFAULT_HEADERS, verify=False)
+                            resp = requests.get(api_url, timeout=15, headers=auth_headers, verify=False)
                             debug.append(f"{api_url} → {resp.status_code}")
                             if resp.status_code in (401, 403, 404):
                                 debug[-1] += " (跳过)"
@@ -199,7 +217,7 @@ class RepoProvider:
                     try:
                         resp = requests.get(
                             api_url, timeout=ms_timeout,
-                            headers=DEFAULT_HEADERS,
+                            headers=auth_headers,
                             verify=False
                         )
                         debug.append(f"{api_url} → {resp.status_code}")

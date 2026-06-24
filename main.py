@@ -3,9 +3,9 @@ import os
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
-from qfluentwidgets import FluentTranslator
 from src.config import cfg, Language
 from src.main_window import MainWindow
+from src.i18n import install_language
 
 
 def resource_path(relative_path: str) -> str:
@@ -35,10 +35,9 @@ def main():
     # 应用保存的语言设置
     lang_code = cfg.get(cfg.language)
     locale = Language.from_code(lang_code)
-    current_translator = FluentTranslator(locale)
-    app.installTranslator(current_translator)
+    current_translator = install_language(locale, app)
 
-    w = MainWindow(current_translator)
+    w = MainWindow(current_translator, app)
     w.show()
 
     sys.exit(app.exec())
