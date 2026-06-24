@@ -10,7 +10,7 @@ from qfluentwidgets import (
     SearchLineEdit, ComboBox, SwitchButton, PrimaryPushButton,
     PushButton, InfoBar, InfoBarPosition, OptionsSettingCard,
     BodyLabel, TitleLabel, CaptionLabel, SubtitleLabel,
-    PasswordLineEdit, ToolButton, setTheme
+    PasswordLineEdit, ToolButton, setTheme, SmoothScrollArea
 )
 from qfluentwidgets.common.config import qconfig, Theme
 from .downloader import RepoProvider, FileInfo
@@ -97,6 +97,7 @@ class RepoPage(QWidget):
                 self.repo_type_combo.setCurrentIndex(i)
                 break
         self.download_queue.retranslateUi()
+        self.log_widget.retranslateUi()
 
     def on_browse(self):
         repo_id = self.repo_id_edit.text().strip()
@@ -115,24 +116,24 @@ class RepoPage(QWidget):
         repo_type = self.repo_type_combo.currentData()
 
         try:
-            self.log_widget.log(f"正在获取 {repo_id} 的文件列表...")
+            self.log_widget.log(tr("正在获取 {0} 的文件列表...").format(repo_id))
             mirror = self.mirror_switch.isChecked() if self.mirror_switch else False
             files = RepoProvider.list_files(self.provider, repo_id, repo_type, mirror_enabled=mirror)
 
             if not files:
                 InfoBar.warning(
-                    title="提示",
-                    content=f"未找到文件。请检查仓库ID和类型是否正确，或检查网络连接",
+                    title=tr("提示"),
+                    content=tr("未找到文件。请检查仓库ID和类型是否正确，或检查网络连接"),
                     orient=Qt.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP_RIGHT,
                     duration=5000,
                     parent=self
                 )
-                self.log_widget.log(f"❌ 未找到 {repo_id} 的文件（已尝试model和dataset类型）")
+                self.log_widget.log(tr("❌ 未找到 {0} 的文件（已尝试model和dataset类型）").format(repo_id))
                 return
 
-            self.log_widget.log(f"✅ 获取到 {len(files)} 个文件")
+            self.log_widget.log(tr("✅ 获取到 {0} 个文件").format(len(files)))
 
             dialog = FileTreeDialog(files, self)
             if dialog.exec():
@@ -140,8 +141,8 @@ class RepoPage(QWidget):
                 for file_info in selected:
                     self.download_queue.add_file(file_info)
                 InfoBar.success(
-                    title="添加成功",
-                    content=f"已添加 {len(selected)} 个文件到下载队列",
+                    title=tr("添加成功"),
+                    content=tr("已添加 {0} 个文件到下载队列").format(len(selected)),
                     orient=Qt.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP_RIGHT,
@@ -150,16 +151,17 @@ class RepoPage(QWidget):
                 )
 
         except Exception as e:
+            err_msg = str(e)
             InfoBar.error(
-                title="错误",
-                content=f"获取文件列表失败: {str(e)}",
+                title=tr("错误"),
+                content=tr("获取文件列表失败: {0}").format(err_msg),
                 orient=Qt.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT,
                 duration=4000,
                 parent=self
             )
-            self.log_widget.log(f"❌ 获取文件列表失败: {str(e)}")
+            self.log_widget.log(tr("❌ 获取文件列表失败: {0}").format(err_msg))
 
     def on_log_message(self, message: str):
         self.log_widget.log(message)
@@ -176,7 +178,15 @@ class SettingsPage(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = SmoothScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
@@ -282,7 +292,6 @@ class SettingsPage(QWidget):
 
         # -- 提示文字 --
         self.auth_hint = CaptionLabel(tr("Token 仅用于 API 认证，安全存储在本地配置文件中"))
-        self.auth_hint.setStyleSheet("color: #888;")
         auth_layout.addWidget(self.auth_hint)
 
         # -- 保存按钮 --
@@ -313,6 +322,11 @@ class SettingsPage(QWidget):
         layout.addWidget(about_card)
 
         layout.addStretch()
+
+        # 将内容放入滚动区域
+        scroll.setWidget(content_widget)
+        scroll.enableTransparentBackground()
+        outer_layout.addWidget(scroll)
 
     def retranslateUi(self):
         self.settings_title.setText(tr("设置"))
@@ -429,7 +443,7 @@ class MainWindow(FluentWindow):
         )
         self.addSubInterface(
             self.history_page,
-            FIF.HISTORY,
+            QIcon(resource_path("src/icon/history.svg")),
             tr("下载历史")
         )
 

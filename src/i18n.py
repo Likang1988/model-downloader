@@ -115,6 +115,32 @@ _STRINGS: dict[str, str] = {
 
     # ---- 下载日志 ----
     "下载日志": "Download Log",
+    "暂无日志": "No logs",
+
+    # ---- 文件选择对话框 ----
+    "选择要下载的文件": "Select Files to Download",
+    "共 {0} 个文件": "{0} files",
+    "全选": "Select All",
+    "展开全部": "Expand All",
+    "折叠全部": "Collapse All",
+    "已选择 0 项": "0 items selected",
+    "已选择 {0} 项": "{0} items selected",
+    "总大小: 0 B": "Total: 0 B",
+    "总大小: {0}": "Total: {0}",
+    "取消": "Cancel",
+    "加入队列 (0)": "Add to Queue (0)",
+    "加入队列 ({0})": "Add to Queue ({0})",
+    "类型": "Type",
+    "单击选择保存目录": "Click to select save directory",
+    "打开保存路径": "Open save path",
+
+    # ---- RepoPage 日志 / InfoBar ----
+    "正在获取 {0} 的文件列表...": "Fetching file list for {0}...",
+    "❌ 未找到 {0} 的文件（已尝试model和dataset类型）": "❌ No files found for {0} (tried both model and dataset types)",
+    "✅ 获取到 {0} 个文件": "✅ Retrieved {0} files",
+    "已添加 {0} 个文件到下载队列": "Added {0} file(s) to the download queue",
+    "获取文件列表失败: {0}": "Failed to get file list: {0}",
+    "❌ 获取文件列表失败: {0}": "❌ Failed to get file list: {0}",
 }
 
 # ── 单例翻译器引用 ──

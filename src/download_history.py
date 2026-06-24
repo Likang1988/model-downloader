@@ -184,7 +184,7 @@ class HistoryPage(QWidget):
         header.addStretch()
 
         # 清空历史按钮
-        self.clear_btn = ToolButton(FIF.DELETE)
+        self.clear_btn = ToolButton(FIF.BROOM)
         self.clear_btn.setFixedSize(36, 36)
         self.clear_btn.setToolTip("清空全部历史")
         self.clear_btn.clicked.connect(self._on_clear_all)
@@ -192,11 +192,11 @@ class HistoryPage(QWidget):
 
         layout.addLayout(header)
 
-        # 筛选按钮组
+        # 筛选按钮组 + 操作按钮
         filter_layout = QHBoxLayout()
-        self.filter_all = PushButton("全部")
-        self.filter_success = PushButton("下载完成")
-        self.filter_failed = PushButton("下载失败")
+        self.filter_all = PushButton(tr("全部"))
+        self.filter_success = PushButton(tr("下载完成"))
+        self.filter_failed = PushButton(tr("下载失败"))
         self.filter_all.setChecked(True)
 
         self.filter_all.clicked.connect(lambda: self._set_filter("全部"))
@@ -207,6 +207,22 @@ class HistoryPage(QWidget):
         filter_layout.addWidget(self.filter_success)
         filter_layout.addWidget(self.filter_failed)
         filter_layout.addStretch()
+
+        self.redownload_btn = PushButton(FIF.DOWNLOAD, tr("重新下载"))
+        self.redownload_btn.setFixedHeight(32)
+        self.redownload_btn.clicked.connect(self._on_redownload)
+
+        self.delete_btn = PushButton(FIF.DELETE, tr("删除记录"))
+        self.delete_btn.setFixedHeight(32)
+        self.delete_btn.clicked.connect(self._on_delete_selected)
+
+        self.open_btn = PrimaryPushButton(FIF.FOLDER, tr("打开位置"))
+        self.open_btn.setFixedHeight(32)
+        self.open_btn.clicked.connect(self._on_open_location)
+
+        filter_layout.addWidget(self.redownload_btn)
+        filter_layout.addWidget(self.delete_btn)
+        filter_layout.addWidget(self.open_btn)
         layout.addLayout(filter_layout)
 
         # 表格
@@ -243,27 +259,6 @@ class HistoryPage(QWidget):
 
         layout.addWidget(self.table, 1)
 
-        # 操作按钮栏
-        actions = QHBoxLayout()
-        self.open_btn = PrimaryPushButton(FIF.FOLDER, "打开位置")
-        self.open_btn.setFixedHeight(32)
-        self.open_btn.clicked.connect(self._on_open_location)
-
-        self.redownload_btn = PushButton(FIF.DOWNLOAD, "重新下载")
-        self.redownload_btn.setFixedHeight(32)
-        self.redownload_btn.clicked.connect(self._on_redownload)
-
-        self.delete_btn = PushButton(FIF.DELETE, "删除记录")
-        self.delete_btn.setFixedHeight(32)
-        self.delete_btn.clicked.connect(self._on_delete_selected)
-
-        actions.addWidget(self.open_btn)
-        actions.addWidget(self.redownload_btn)
-        actions.addWidget(self.delete_btn)
-        actions.addStretch()
-
-        layout.addLayout(actions)
-
         # 填充数据
         self._refresh_table()
 
@@ -297,7 +292,7 @@ class HistoryPage(QWidget):
         success = len([r for r in all_records if r.get("status") == "下载完成"])
         failed = len([r for r in all_records if r.get("status") in ("下载失败", "已取消")])
         self._count_label.setText(
-            f"全部 {total} | 完成 {success} | 失败 {failed}"
+            f"{tr('全部')} {total} | {tr('完成')} {success} | {tr('失败')} {failed}"
         )
 
         for row, rec in enumerate(records):

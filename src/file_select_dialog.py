@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 from qfluentwidgets import PrimaryPushButton, PushButton, BodyLabel, CaptionLabel
 from .downloader import FileInfo
+from .i18n import tr
 
 
 def format_size(size: int) -> str:
@@ -27,7 +28,7 @@ class FileTreeDialog(QDialog):
         super().__init__(parent)
         self.files = files
         self._selected_files = []
-        self.setWindowTitle("选择要下载的文件")
+        self.setWindowTitle(tr("选择要下载的文件"))
         self.resize(700, 550)
         self.init_ui()
         self.populate_tree()
@@ -39,22 +40,22 @@ class FileTreeDialog(QDialog):
 
         # 顶部信息栏
         info_layout = QHBoxLayout()
-        self.repo_label = BodyLabel(f"共 {len(self.files)} 个文件")
+        self.repo_label = BodyLabel(tr("共 {0} 个文件").format(len(self.files)))
         info_layout.addWidget(self.repo_label)
         info_layout.addStretch()
         layout.addLayout(info_layout)
 
         # 工具栏
         toolbar = QHBoxLayout()
-        self.select_all_cb = QCheckBox("全选")
+        self.select_all_cb = QCheckBox(tr("全选"))
         self.select_all_cb.toggled.connect(self.on_select_all_toggled)
-        self.expand_btn = QPushButton("展开全部")
+        self.expand_btn = QPushButton(tr("展开全部"))
         self.expand_btn.clicked.connect(self.toggle_expand)
-        self.collapse_btn = QPushButton("折叠全部")
+        self.collapse_btn = QPushButton(tr("折叠全部"))
         self.collapse_btn.clicked.connect(self.collapse_all)
 
-        self.selection_label = CaptionLabel("已选择 0 项")
-        self.size_label = CaptionLabel("总大小: 0 B")
+        self.selection_label = CaptionLabel(tr("已选择 0 项"))
+        self.size_label = CaptionLabel(tr("总大小: 0 B"))
 
         toolbar.addWidget(self.select_all_cb)
         toolbar.addWidget(self.expand_btn)
@@ -66,7 +67,7 @@ class FileTreeDialog(QDialog):
 
         # 树形控件
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["文件名", "大小", "类型"])
+        self.tree.setHeaderLabels([tr("文件名"), tr("大小"), tr("类型")])
         self.tree.setColumnWidth(0, 350)
         self.tree.setColumnWidth(1, 100)
         self.tree.setIndentation(20)
@@ -94,9 +95,9 @@ class FileTreeDialog(QDialog):
 
         # 底部按钮
         btn_layout = QHBoxLayout()
-        self.cancel_btn = PushButton("取消")
+        self.cancel_btn = PushButton(tr("取消"))
         self.cancel_btn.clicked.connect(self.reject)
-        self.ok_btn = PrimaryPushButton("加入队列 (0)")
+        self.ok_btn = PrimaryPushButton(tr("加入队列 (0)"))
         self.ok_btn.clicked.connect(self.accept)
         self.ok_btn.setEnabled(False)
         btn_layout.addStretch()
@@ -247,9 +248,9 @@ class FileTreeDialog(QDialog):
         count = len(selected)
         total_size = sum(f.size for f in selected)
 
-        self.selection_label.setText(f"已选择 {count} 项")
-        self.size_label.setText(f"总大小: {format_size(total_size)}")
-        self.ok_btn.setText(f"加入队列 ({count})")
+        self.selection_label.setText(tr("已选择 {0} 项").format(count))
+        self.size_label.setText(tr("总大小: {0}").format(format_size(total_size)))
+        self.ok_btn.setText(tr("加入队列 ({0})").format(count))
         self.ok_btn.setEnabled(count > 0)
 
     def toggle_expand(self):

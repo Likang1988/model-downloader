@@ -156,16 +156,16 @@ class DownloadQueueWidget(QWidget):
         self.count_label = CaptionLabel(tr("共 0 项"))
 
         # 保存路径
-        path_prefix = BodyLabel(tr("保存路径:"))
+        self.path_prefix = BodyLabel(tr("保存路径:"))
         self.path_edit = ClickableLabel(self._save_path)
         self.path_edit.setMinimumWidth(120)
         self.path_edit.setMaximumWidth(200)
         self.path_edit.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.path_edit.setToolTip("单击选择保存目录")
+        self.path_edit.setToolTip(tr("单击选择保存目录"))
         self.path_edit.clicked.connect(self._on_browse_path)
         self.browse_path_btn = PushButton("📁")
         self.browse_path_btn.setFixedWidth(36)
-        self.browse_path_btn.setToolTip("打开保存路径")
+        self.browse_path_btn.setToolTip(tr("打开保存路径"))
         self.browse_path_btn.clicked.connect(self._on_open_path)
 
         # 控制按钮
@@ -213,7 +213,7 @@ class DownloadQueueWidget(QWidget):
         header_bar.addWidget(self.count_label)
         header_bar.addStretch()
         header_bar.addWidget(self.total_progress)
-        header_bar.addWidget(path_prefix)
+        header_bar.addWidget(self.path_prefix)
         header_bar.addWidget(self.path_edit)
         header_bar.addWidget(self.browse_path_btn)
         header_bar.addSpacing(8)
@@ -312,6 +312,9 @@ class DownloadQueueWidget(QWidget):
     def retranslateUi(self):
         self.queue_title.setText(tr("下载队列"))
         self.count_label.setText(tr("共 0 项").format(self.table.rowCount()))
+        self.path_prefix.setText(tr("保存路径:"))
+        self.path_edit.setToolTip(tr("单击选择保存目录"))
+        self.browse_path_btn.setToolTip(tr("打开保存路径"))
         self.start_sel_btn.setText(tr("开始"))
         self.pause_sel_btn.setText(tr("暂停"))
         self.remove_sel_btn.setText(tr("移除"))
@@ -708,8 +711,3 @@ class DownloadQueueWidget(QWidget):
         if total_size > 0:
             pct = int((total_dl / total_size) * 100)
             self.total_progress.setValue(pct)
-            self.total_progress.setFormat(f"总进度: {pct}%")
-            self.total_progress.setVisible(True)
-
-    def has_tasks(self) -> bool:
-        return len(self.tasks) > 0

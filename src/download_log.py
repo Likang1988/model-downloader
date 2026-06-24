@@ -15,7 +15,7 @@ class LogWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        self.title_label = SubtitleLabel("下载日志")
+        self.title_label = SubtitleLabel(tr("下载日志"))
         layout.addWidget(self.title_label)
 
         self.log_area = TextEdit()
