@@ -96,6 +96,7 @@ class DownloadTask(QObject):
             with open(file_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if self.canceled:
+                        self._cleanup_file()
                         self.download_canceled.emit(self.task_id)
                         return
 
@@ -111,6 +112,15 @@ class DownloadTask(QObject):
             self.download_completed.emit(self.task_id)
         except Exception as e:
             self.download_failed.emit(self.task_id, str(e))
+
+    def _cleanup_file(self):
+        """删除未完成的下载文件"""
+        file_path = os.path.join(self.save_path, self.file_info.repo_id, self.file_info.path)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
 
     def _wait_for_resume(self):
         import time

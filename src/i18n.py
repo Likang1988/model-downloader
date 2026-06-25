@@ -131,6 +131,7 @@ _STRINGS: dict[str, str] = {
     "加入队列 (0)": "Add to Queue (0)",
     "加入队列 ({0})": "Add to Queue ({0})",
     "类型": "Type",
+    "文件夹": "Folder",
     "单击选择保存目录": "Click to select save directory",
     "打开保存路径": "Open save path",
 
@@ -141,6 +142,31 @@ _STRINGS: dict[str, str] = {
     "已添加 {0} 个文件到下载队列": "Added {0} file(s) to the download queue",
     "获取文件列表失败: {0}": "Failed to get file list: {0}",
     "❌ 获取文件列表失败: {0}": "❌ Failed to get file list: {0}",
+
+    # ---- 文件类型 ----
+    "模型文件": "Model file",
+    "SafeTensor模型": "SafeTensor model",
+    "PyTorch模型": "PyTorch model",
+    "ONNX模型": "ONNX model",
+    "配置文件": "Config file",
+    "文本": "Text",
+    "文档": "Document",
+    "Python脚本": "Python script",
+    "YAML配置": "YAML config",
+    "Git配置": "Git config",
+    "HDF5模型": "HDF5 model",
+    "Pickle文件": "Pickle file",
+    "文件": "file",
+
+    # ---- 下载状态 ----
+    "等待下载": "Waiting",
+    "下载中": "Downloading",
+    "已暂停": "Paused",
+    "下载完成": "Completed",
+    "下载失败": "Failed",
+    "已取消": "Canceled",
+    "连接中...": "Connecting...",
+    "总进度: %p%": "Total: %p%",
 }
 
 # ── 单例翻译器引用 ──

@@ -14,7 +14,7 @@ from PySide6.QtGui import QPainter, QColor, QMouseEvent
 from qfluentwidgets import (
     TableWidget, PushButton, BodyLabel, CaptionLabel, SubtitleLabel,
     InfoBar, InfoBarPosition, PrimaryPushButton, ToolButton,
-    FluentIcon as FIF, MessageDialog
+    FluentIcon as FIF, MessageDialog, isDarkTheme
 )
 from .config import get_config_dir, get_config_path
 from .i18n import tr
@@ -64,7 +64,7 @@ class HistoryDelegate(QStyledItemDelegate):
             painter.setBrush(color.lighter(150))
             painter.setPen(color)
             painter.drawRoundedRect(rect, 4, 4)
-            painter.setPen(QColor("#333"))
+            painter.setPen(QColor("#e0e0e0" if isDarkTheme() else "#333"))
             font = painter.font()
             font.setPointSize(9)
             painter.setFont(font)

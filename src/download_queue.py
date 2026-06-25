@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QSize
 from PySide6.QtGui import QPainter, QColor, QFont, QMouseEvent
-from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel
+from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel, isDarkTheme
 from qfluentwidgets import FluentIcon as FIF
 from .downloader import FileInfo, DownloadTask
 from .download_history import history_mgr
@@ -96,8 +96,13 @@ class ProgressDelegate(QStyledItemDelegate):
             color = STATUS_COLORS.get(status, "#2196F3")
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+            # 使用 isDarkTheme() 适配深色/浅色主题
+            dark = isDarkTheme()
+            bg_color = "#3a3a3a" if dark else "#f0f0f0"
+            text_color = "#e0e0e0" if dark else "#333"
+
             # 背景
-            painter.setBrush(QColor("#f0f0f0"))
+            painter.setBrush(QColor(bg_color))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(rect, 5, 5)
 
@@ -109,7 +114,7 @@ class ProgressDelegate(QStyledItemDelegate):
                 painter.drawRoundedRect(fill_rect, 5, 5)
 
             # 文字
-            painter.setPen(QColor("#333"))
+            painter.setPen(QColor(text_color))
             font = painter.font()
             font.setPointSize(9)
             font.setBold(True)
@@ -192,7 +197,7 @@ class DownloadQueueWidget(QWidget):
         self.total_progress.setValue(0)
         self.total_progress.setFixedWidth(120)
         self.total_progress.setFixedHeight(16)
-        self.total_progress.setFormat("总进度: %p%")
+        self.total_progress.setFormat(tr("总进度: %p%"))
         self.total_progress.setVisible(False)
         self.total_progress.setStyleSheet("""
             QProgressBar {
@@ -701,6 +706,7 @@ class DownloadQueueWidget(QWidget):
             self.total_progress.setVisible(False)
             return
 
+        self.total_progress.setVisible(True)
         total_size = 0
         total_dl = 0
         for ti in self.tasks.values():

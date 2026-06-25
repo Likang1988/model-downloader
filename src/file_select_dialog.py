@@ -1,11 +1,11 @@
 import os
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QCheckBox, QPushButton, QHeaderView, QWidget, QAbstractItemView
+    QDialog, QVBoxLayout, QHBoxLayout, QTreeWidgetItem,
+    QHeaderView, QWidget, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
-from qfluentwidgets import PrimaryPushButton, PushButton, BodyLabel, CaptionLabel
+from qfluentwidgets import PrimaryPushButton, PushButton, BodyLabel, CaptionLabel, CheckBox, TreeWidget 
+from qfluentwidgets.common.style_sheet import FluentStyleSheet
 from .downloader import FileInfo
 from .i18n import tr
 
@@ -30,6 +30,10 @@ class FileTreeDialog(QDialog):
         self._selected_files = []
         self.setWindowTitle(tr("选择要下载的文件"))
         self.resize(700, 550)
+
+        # 应用 QFluentWidgets 对话框主题（浅色/深色自适应）
+        FluentStyleSheet.DIALOG.apply(self)
+
         self.init_ui()
         self.populate_tree()
 
@@ -47,11 +51,11 @@ class FileTreeDialog(QDialog):
 
         # 工具栏
         toolbar = QHBoxLayout()
-        self.select_all_cb = QCheckBox(tr("全选"))
+        self.select_all_cb = CheckBox(tr("全选"))
         self.select_all_cb.toggled.connect(self.on_select_all_toggled)
-        self.expand_btn = QPushButton(tr("展开全部"))
+        self.expand_btn = PushButton(tr("展开全部"))
         self.expand_btn.clicked.connect(self.toggle_expand)
-        self.collapse_btn = QPushButton(tr("折叠全部"))
+        self.collapse_btn = PushButton(tr("折叠全部"))
         self.collapse_btn.clicked.connect(self.collapse_all)
 
         self.selection_label = CaptionLabel(tr("已选择 0 项"))
@@ -66,26 +70,13 @@ class FileTreeDialog(QDialog):
         layout.addLayout(toolbar)
 
         # 树形控件
-        self.tree = QTreeWidget()
+        self.tree = TreeWidget()
         self.tree.setHeaderLabels([tr("文件名"), tr("大小"), tr("类型")])
         self.tree.setColumnWidth(0, 350)
         self.tree.setColumnWidth(1, 100)
         self.tree.setIndentation(20)
         self.tree.setAnimated(True)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.tree.setStyleSheet("""
-            QTreeWidget {
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                font-size: 12px;
-            }
-            QTreeWidget::item {
-                padding: 3px 0px;
-            }
-            QTreeWidget::item:hover {
-                background-color: #f0f4ff;
-            }
-        """)
         header = self.tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -145,7 +136,7 @@ class FileTreeDialog(QDialog):
                     item = QTreeWidgetItem()
                     item.setText(0, "📁 " + part)
                     item.setText(1, "")
-                    item.setText(2, "文件夹")
+                    item.setText(2, tr("文件夹"))
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                     item.setCheckState(0, Qt.CheckState.Checked)
                     item.setData(0, Qt.ItemDataRole.UserRole, None)
@@ -184,14 +175,14 @@ class FileTreeDialog(QDialog):
     def _guess_file_type(self, filename: str) -> str:
         ext = os.path.splitext(filename.lower())[1]
         mapping = {
-            ".bin": "模型文件", ".safetensors": "SafeTensor模型",
-            ".pt": "PyTorch模型", ".pth": "PyTorch模型", ".onnx": "ONNX模型",
-            ".json": "配置文件", ".txt": "文本", ".md": "文档",
-            ".py": "Python脚本", ".yaml": "YAML配置", ".yml": "YAML配置",
-            ".gitattributes": "Git配置", ".gitignore": "Git配置",
-            ".h5": "HDF5模型", ".pkl": "Pickle文件",
+            ".bin": tr("模型文件"), ".safetensors": tr("SafeTensor模型"),
+            ".pt": tr("PyTorch模型"), ".pth": tr("PyTorch模型"), ".onnx": tr("ONNX模型"),
+            ".json": tr("配置文件"), ".txt": tr("文本"), ".md": tr("文档"),
+            ".py": tr("Python脚本"), ".yaml": tr("YAML配置"), ".yml": tr("YAML配置"),
+            ".gitattributes": tr("Git配置"), ".gitignore": tr("Git配置"),
+            ".h5": tr("HDF5模型"), ".pkl": tr("Pickle文件"),
         }
-        return mapping.get(ext, ext.upper() + "文件" if ext else "文件")
+        return mapping.get(ext, ext.upper() + tr("文件") if ext else tr("文件"))
 
     def on_select_all_toggled(self, checked: bool):
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
