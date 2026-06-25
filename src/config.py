@@ -6,8 +6,10 @@ from qfluentwidgets.common.config import (
     QConfig,
     ConfigItem,
     OptionsConfigItem,
+    RangeConfigItem,
     OptionsValidator,
     BoolValidator,
+    RangeValidator,
     qconfig,
     Theme,
 )
@@ -63,6 +65,17 @@ class AppConfig(QConfig):
     # ModelScope Token（用于访问私有模型/数据集）
     ms_token = ConfigItem(
         "Auth", "ModelScopeToken", "",
+    )
+
+    # 下载速度限制（0 表示不限制，单位：MB/s）
+    download_speed_limit = ConfigItem(
+        "Download", "SpeedLimit", 0,
+    )
+
+    # 并发下载数量（1-8）
+    download_concurrency = RangeConfigItem(
+        "Download", "Concurrency", 4,
+        RangeValidator(1, 8),
     )
 
 

@@ -8,9 +8,9 @@ from PySide6.QtGui import QIcon, QDesktopServices
 from qfluentwidgets import (
     FluentWindow, FluentIcon as FIF, NavigationItemPosition,
     SearchLineEdit, ComboBox, SwitchButton, PrimaryPushButton,
-    PushButton, InfoBar, InfoBarPosition, OptionsSettingCard,
-    BodyLabel, TitleLabel, CaptionLabel, SubtitleLabel,
-    PasswordLineEdit, ToolButton, setTheme, SmoothScrollArea
+    PushButton, InfoBar, InfoBarPosition,
+    BodyLabel, TitleLabel, SubtitleLabel,
+    setTheme
 )
 from qfluentwidgets.common.config import qconfig, Theme
 from .downloader import RepoProvider, FileInfo
@@ -18,8 +18,9 @@ from .file_select_dialog import FileTreeDialog
 from .download_queue import DownloadQueueWidget
 from .download_log import LogWidget
 from .download_history import HistoryPage
-from .config import cfg, Language
-from .i18n import tr, install_language
+from .setting import SettingsPage
+from .config import cfg
+from .i18n import tr
 
 
 def resource_path(relative_path: str) -> str:
@@ -167,221 +168,6 @@ class RepoPage(QWidget):
         self.log_widget.log(message)
 
 
-class SettingsPage(QWidget):
-    """设置页面 — 镜像、主题、语言"""
-    def __init__(self, mirror_switch=None, app=None, translator=None, main_window=None, parent=None):
-        super().__init__(parent)
-        self.mirror_switch = mirror_switch or SwitchButton()
-        self._app = app
-        self._translator = translator
-        self._main_window = main_window
-        self.init_ui()
-
-    def init_ui(self):
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-
-        scroll = SmoothScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        content_widget = QWidget()
-        layout = QVBoxLayout(content_widget)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        self.settings_title = TitleLabel(tr("设置"))
-        layout.addWidget(self.settings_title)
-
-        # ======== 外观卡片：主题 + 语言 ========
-        appearance_card = QFrame()
-        appearance_card.setObjectName("settings_card")
-        appearance_layout = QVBoxLayout(appearance_card)
-        appearance_layout.setSpacing(12)
-
-        self.appearance_title = SubtitleLabel(tr("外观"))
-        appearance_layout.addWidget(self.appearance_title)
-
-        # -- 主题 --
-        self.themeCard = OptionsSettingCard(
-            cfg.themeMode,
-            FIF.BRUSH,
-            tr("主题模式"),
-            tr("更改应用的外观"),
-            texts=[tr("浅色"), tr("深色"), tr("跟随系统")],
-            parent=self
-        )
-        appearance_layout.addWidget(self.themeCard)
-
-        # -- 语言（使用与主题一致的 OptionsSettingCard 样式） --
-        lang_options = [d for d, _ in Language.options()]
-        self.langCard = OptionsSettingCard(
-            cfg.language,
-            FIF.LANGUAGE,
-            tr("界面语言"),
-            tr("切换应用的显示语言"),
-            texts=lang_options,
-            parent=self
-        )
-        # 语言设置 — 监听配置项值变化
-        cfg.language.valueChanged.connect(self._on_language_changed)
-        appearance_layout.addWidget(self.langCard)
-
-        layout.addWidget(appearance_card)
-
-        # ======== 下载卡片：镜像开关 ========
-        mirror_card = QFrame()
-        mirror_card.setObjectName("settings_card")
-        mirror_layout = QHBoxLayout(mirror_card)
-
-        self.mirror_label = BodyLabel(tr("使用 HF-Mirror 镜像（国内加速访问 Hugging Face）"))
-
-        # 从配置恢复镜像开关状态
-        self.mirror_switch.setChecked(cfg.get(cfg.mirror_enabled))
-        self.mirror_switch.checkedChanged.connect(self._on_mirror_changed)
-
-        mirror_layout.addWidget(self.mirror_label)
-        mirror_layout.addStretch()
-        mirror_layout.addWidget(self.mirror_switch)
-        layout.addWidget(mirror_card)
-
-        # ======== 认证卡片：HF Token + ModelScope Token ========
-        auth_card = QFrame()
-        auth_card.setObjectName("settings_card")
-        auth_layout = QVBoxLayout(auth_card)
-        auth_layout.setSpacing(12)
-
-        self.auth_title = SubtitleLabel(tr("认证"))
-        auth_layout.addWidget(self.auth_title)
-
-        # -- HuggingFace Token --
-        hf_row = QHBoxLayout()
-        hf_label = BodyLabel("HuggingFace Token")
-        hf_label.setMinimumWidth(100)
-        self.hf_token_edit = PasswordLineEdit()
-        self.hf_token_edit.setPlaceholderText(tr("输入 HF Token（私有仓库需要）"))
-        self.hf_token_edit.setText(cfg.get(cfg.hf_token))
-        hf_row.addWidget(hf_label)
-        hf_row.addWidget(self.hf_token_edit, 1)
-        hf_link_btn = ToolButton(FIF.LINK)
-        hf_link_btn.setToolTip(tr("获取 HuggingFace Token（打开 huggggingface.co/settings/tokens）"))
-        hf_link_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://huggingface.co/settings/tokens"))
-        )
-        hf_row.addWidget(hf_link_btn)
-        auth_layout.addLayout(hf_row)
-
-        # -- ModelScope Token --
-        ms_row = QHBoxLayout()
-        ms_label = BodyLabel("ModelScope Token")
-        ms_label.setMinimumWidth(100)
-        self.ms_token_edit = PasswordLineEdit()
-        self.ms_token_edit.setPlaceholderText(tr("输入 ModelScope Token（私有仓库需要）"))
-        self.ms_token_edit.setText(cfg.get(cfg.ms_token))
-        ms_row.addWidget(ms_label)
-        ms_row.addWidget(self.ms_token_edit, 1)
-        ms_link_btn = ToolButton(FIF.LINK)
-        ms_link_btn.setToolTip(tr("获取 ModelScope Token（打开 www.modelscope.cn/my/myaccesstoken）"))
-        ms_link_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl("https://www.modelscope.cn/my/myaccesstoken")
-            )
-        )
-        ms_row.addWidget(ms_link_btn)
-        auth_layout.addLayout(ms_row)
-
-        # -- 提示文字 --
-        self.auth_hint = CaptionLabel(tr("Token 仅用于 API 认证，安全存储在本地配置文件中"))
-        auth_layout.addWidget(self.auth_hint)
-
-        # -- 保存按钮 --
-        self.save_auth_btn = PushButton(FIF.SAVE, tr("保存认证信息"))
-        self.save_auth_btn.setFixedHeight(32)
-        self.save_auth_btn.clicked.connect(self._on_save_tokens)
-        auth_layout.addWidget(self.save_auth_btn)
-
-        layout.addWidget(auth_card)
-
-        # ======== 关于卡片 ========
-        about_card = QFrame()
-        about_card.setObjectName("settings_card")
-        about_layout = QVBoxLayout(about_card)
-
-        self.about_title = SubtitleLabel(tr("关于"))
-
-        self.about_text = BodyLabel(
-            tr("大模型下载工具 v1.0\n\n"
-               "支持从 Hugging Face 和 ModelScope 下载模型与数据集。\n"
-               "可自主选择需要下载的文件，支持断点续传、暂停/恢复。\n\n"
-               "提示：国内用户建议开启 HF-Mirror 镜像以加速下载。")
-        )
-        self.about_text.setWordWrap(True)
-
-        about_layout.addWidget(self.about_title)
-        about_layout.addWidget(self.about_text)
-        layout.addWidget(about_card)
-
-        layout.addStretch()
-
-        # 将内容放入滚动区域
-        scroll.setWidget(content_widget)
-        scroll.enableTransparentBackground()
-        outer_layout.addWidget(scroll)
-
-    def retranslateUi(self):
-        self.settings_title.setText(tr("设置"))
-        self.appearance_title.setText(tr("外观"))
-        self.mirror_label.setText(tr("使用 HF-Mirror 镜像（国内加速访问 Hugging Face）"))
-        self.auth_title.setText(tr("认证"))
-        self.hf_token_edit.setPlaceholderText(tr("输入 HF Token（私有仓库需要）"))
-        self.ms_token_edit.setPlaceholderText(tr("输入 ModelScope Token（私有仓库需要）"))
-        self.auth_hint.setText(tr("Token 仅用于 API 认证，安全存储在本地配置文件中"))
-        self.save_auth_btn.setText(tr("保存认证信息"))
-        self.about_title.setText(tr("关于"))
-        self.about_text.setText(
-            tr("大模型下载工具 v1.0\n\n"
-               "支持从 Hugging Face 和 ModelScope 下载模型与数据集。\n"
-               "可自主选择需要下载的文件，支持断点续传、暂停/恢复。\n\n"
-               "提示：国内用户建议开启 HF-Mirror 镜像以加速下载。")
-        )
-
-    # ---- 事件处理 ----
-
-    def _on_language_changed(self, code: str):
-        """语言切换回调 — 配置项值变化时触发"""
-        locale = Language.from_code(code)
-        install_language(locale, self._app)
-        InfoBar.success(
-            title=tr("成功"),
-            content=tr("语言已切换"),
-            orient=Qt.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP_RIGHT,
-            duration=3000,
-            parent=self,
-        )
-        # 通知主窗口重绘所有页面
-        if self._main_window:
-            self._main_window.retranslateAll()
-
-    def _on_mirror_changed(self, checked):
-        cfg.set(cfg.mirror_enabled, checked)
-
-    def _on_save_tokens(self):
-        """保存 Token 认证信息并提示"""
-        cfg.set(cfg.hf_token, self.hf_token_edit.text().strip())
-        cfg.set(cfg.ms_token, self.ms_token_edit.text().strip())
-        InfoBar.success(
-            title="认证信息已保存",
-            content="Token 已安全存储在本地配置文件中",
-            orient=Qt.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP_RIGHT,
-            duration=3000,
-            parent=self,
-        )
-
-
 class MainWindow(FluentWindow):
     def __init__(self, translator=None, app=None):
         super().__init__()
@@ -395,6 +181,8 @@ class MainWindow(FluentWindow):
         # 镜像开关
         self.mirror_switch = SwitchButton()
         self.mirror_switch.setChecked(cfg.get(cfg.mirror_enabled))
+        # 监听配置变化，同步更新主窗口的 mirror_switch
+        cfg.mirror_enabled.valueChanged.connect(self.mirror_switch.setChecked)
 
         # 创建页面
         self.hf_page = RepoPage("huggingface", self.mirror_switch)
