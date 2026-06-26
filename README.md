@@ -2,7 +2,7 @@
 
 <p align="center">
 
-<p align="center"><img width="15%" align="center" src="src\icon\HuggingScope.png" alt="logo">
+<p align="center"><img width="15%" align="center" src="src/icon/HuggingScope.png" alt="logo">
 
 一款基于 PySide6 + QFluentWidgets 构建的桌面大模型下载工具，支持从 Hugging Face 和 ModelScope 下载模型与数据集。
 
@@ -14,7 +14,7 @@
 
 - **双源支持** — 同时支持 Hugging Face 和 ModelScope 两个主流 AI 模型平台
 - **树形文件选择** — 按目录结构展示仓库文件，支持多选/全选
-- **下载队列管理** — 多任务排队下载，支持暂停/恢复/取消，最多 3 个并发
+- **下载队列管理** — 多任务排队下载，支持暂停/恢复/取消，最多 8 个并发
 - **下载历史记录** — 持久化存储历史记录，支持按状态筛选、重新下载、打开文件位置
 - **主题切换** — 内置浅色/深色/跟随系统三种主题模式
 - **中英双语** — 界面语言即时切换，无需重启
@@ -24,14 +24,49 @@
 
 ## 界面预览
 
+### 文件选择对话框
+
+支持按目录结构展示仓库文件，可多选或全选需要下载的文件：
+
+<p align="center">
+  <img src="image/file-selection.png" alt="文件选择对话框" width="80%">
+</p>
+
+### 主页面
+
 应用包含四个主要页面：
 
-| 页面                   | 功能                                       |
-| ---------------------- | ------------------------------------------ |
-| **ModelScope**   | 输入仓库 ID，获取文件列表，选择下载        |
-| **Hugging Face** | 同上，可选开启 HF-Mirror 镜像加速          |
-| **下载历史**     | 查看历史记录，按完成/失败筛选，重新下载    |
-| **设置**         | 主题、语言、镜像开关、Token 认证、关于信息 |
+#### ModelScope 页面
+
+输入仓库 ID，获取文件列表，选择下载：
+
+<p align="center">
+  <img src="image/modelscope.png" alt="ModelScope 页面" width="80%">
+</p>
+
+#### Hugging Face 页面
+
+支持开启 HF-Mirror 镜像加速下载：
+
+<p align="center">
+  <img src="image/huggingface.png" alt="Hugging Face 页面" width="80%">
+</p>
+
+#### 下载历史页面
+
+查看历史记录，按完成/失败筛选，支持重新下载：
+
+<p align="center">
+  <img src="image/history.png" alt="下载历史页面" width="80%">
+</p>
+
+#### 设置页面
+
+主题、语言、镜像开关、Token 认证、关于信息：
+
+<p align="center">
+  <img src="image/setting.png" alt="设置页面" width="80%">
+</p>
 
 ## 安装与运行
 

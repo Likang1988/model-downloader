@@ -64,6 +64,14 @@ class TestDownloadTask:
         task = DownloadTask(file_info, "/tmp", mirror_enabled=False)
         assert task.get_download_url() == "https://www.modelscope.cn/test/model/resolve/master/model.bin"
 
+    def test_get_download_url_modelscope_dataset(self):
+        file_info = FileInfo(
+            name="data.csv", size=1024, path="data.csv",
+            repo_id="test/dataset", repo_type="dataset", provider="modelscope"
+        )
+        task = DownloadTask(file_info, "/tmp", mirror_enabled=False)
+        assert task.get_download_url() == "https://www.modelscope.cn/datasets/test/dataset/resolve/master/data.csv"
+
     def test_get_download_url_unknown_provider(self):
         file_info = FileInfo(
             name="model.bin", size=1024, path="model.bin",
@@ -175,10 +183,10 @@ class TestRepoProvider:
 
     def test_search_models_modelscope(self, requests_mock):
         requests_mock.get(
-            "https://api.modelscope.cn/api/v1/models?search=qwen&limit=20",
+            "https://www.modelscope.cn/api/v1/models?search=qwen&limit=20",
             json={
-                "data": [
-                    {"modelId": "qwen/Qwen2.5-7B", "description": "Test model", "downloadCount": 1000, "likeCount": 500}
+                "Data": [
+                    {"Name": "qwen/Qwen2.5-7B", "Description": "Test model", "DownloadCount": 1000, "LikeCount": 500}
                 ]
             }
         )

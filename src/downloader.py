@@ -71,6 +71,7 @@ class DownloadTask(QObject):
         self.current_size = 0
         self.total_size = 0
         self._mutex = QMutex()
+        self._response = None  # HTTP 响应对象
 
     def get_download_url(self) -> str:
         provider = self.file_info.provider
@@ -85,6 +86,9 @@ class DownloadTask(QObject):
             base = "https://hf-mirror.com" if self.mirror_enabled else "https://huggingface.co"
             return f"{base}/{repo_id}/resolve/main/{path}"
         elif provider == "modelscope":
+            repo_type = self.file_info.repo_type
+            if repo_type == "dataset":
+                return f"https://www.modelscope.cn/datasets/{repo_id}/resolve/master/{path}"
             return f"https://www.modelscope.cn/{repo_id}/resolve/master/{path}"
         return ""
 
@@ -108,12 +112,12 @@ class DownloadTask(QObject):
             if resume_size > 0:
                 headers["Range"] = f"bytes={resume_size}-"
             
-            response = requests.get(url, stream=True, timeout=30, headers=headers)
-            response.raise_for_status()
+            self._response = requests.get(url, stream=True, timeout=30, headers=headers)
+            self._response.raise_for_status()
 
-            total_size = int(response.headers.get("content-length", 0)) or 0
+            total_size = int(self._response.headers.get("content-length", 0)) or 0
             if resume_size > 0:
-                content_range = response.headers.get("content-range", "")
+                content_range = self._response.headers.get("content-range", "")
                 if content_range:
                     match = re.search(r"/(\d+)$", content_range)
                     if match:
@@ -127,8 +131,9 @@ class DownloadTask(QObject):
 
             mode = "ab" if resume_size > 0 else "wb"
             with open(file_path, mode) as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in self._response.iter_content(chunk_size=8192):
                     if self.canceled:
+                        f.close()  # 先关闭文件
                         self._cleanup_file()
                         self._safe_emit_canceled()
                         return
@@ -145,6 +150,11 @@ class DownloadTask(QObject):
             self._safe_emit_completed()
         except Exception as e:
             self._safe_emit_failed(str(e))
+        finally:
+            # 确保响应被关闭
+            if self._response:
+                self._response.close()
+                self._response = None
 
     def _safe_emit_progress(self, current, total):
         try:
@@ -207,6 +217,13 @@ class DownloadTask(QObject):
     def cancel(self):
         self.canceled = True
         self._paused = False
+        # 立即关闭 HTTP 响应，中断 iter_content 循环
+        if self._response:
+            try:
+                self._response.close()
+            except Exception:
+                pass
+            self._response = None
 
     @property
     def is_paused(self):
@@ -287,6 +304,7 @@ class RepoProvider:
 
             elif provider == "modelscope":
                 # 自动尝试 models 和 datasets 两个 API（dataset 树 API 可能较慢，给 30s）
+                # 注意：models 使用 /repo/files，datasets 使用 /repo/tree
                 api_templates = [
                     f"https://www.modelscope.cn/api/v1/models/{repo_id}/repo/files?Revision=master&Recursive=True",
                     f"https://www.modelscope.cn/api/v1/datasets/{repo_id}/repo/tree?Revision=master&Recursive=True",
@@ -305,10 +323,13 @@ class RepoProvider:
                             continue
                         resp.raise_for_status()
                         data = resp.json()
-                        file_list_raw = data.get("Data", {}).get("Files", []) or []
+                        # 兼容两种响应格式：Files 和 Tree
+                        file_list_raw = data.get("Data", {}).get("Files", []) or data.get("Data", {}).get("Tree", []) or []
                         debug[-1] += f" (raw_files={len(file_list_raw)})"
                         for f in file_list_raw:
-                            if f.get("Type") == "tree":
+                            # 过滤目录类型（tree）和 None 类型
+                            f_type = f.get("Type", "")
+                            if f_type in ("tree", "directory", None):
                                 continue
                             files.append(FileInfo(
                                 name=f.get("Name", ""),
@@ -357,18 +378,18 @@ class RepoProvider:
                         "likes": item.get("likes", 0)
                     })
             elif provider == "modelscope":
-                url = f"https://api.modelscope.cn/api/v1/models?search={query}&limit=20"
+                url = f"https://www.modelscope.cn/api/v1/models?search={query}&limit=20"
                 resp = requests.get(url, timeout=15, headers=DEFAULT_HEADERS, verify=False)
                 resp.raise_for_status()
                 data = resp.json()
-                for item in data.get("data", []):
+                for item in data.get("Data", []):
                     results.append({
-                        "id": item.get("modelId", ""),
-                        "name": item.get("modelId", "").split("/")[-1],
-                        "author": item.get("modelId", "").split("/")[0],
-                        "description": item.get("description", ""),
-                        "downloads": item.get("downloadCount", 0),
-                        "likes": item.get("likeCount", 0)
+                        "id": item.get("Name", ""),
+                        "name": item.get("Name", "").split("/")[-1],
+                        "author": item.get("Name", "").split("/")[0],
+                        "description": item.get("Description", ""),
+                        "downloads": item.get("DownloadCount", 0),
+                        "likes": item.get("LikeCount", 0)
                     })
         except Exception as e:
             raise e

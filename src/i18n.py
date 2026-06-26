@@ -38,6 +38,12 @@ _STRINGS: dict[str, str] = {
     "确认关闭": "Confirm Close",
     "当前有 {0} 个任务正在下载中，关闭程序将暂停所有任务。": "{0} task(s) are currently downloading. Closing the program will pause all tasks.",
     "是否确定关闭？": "Are you sure you want to close?",
+    "确认删除": "Confirm Delete",
+    "以下文件已存在于本地：\n{0}\n\n是否同时删除本地文件？": "The following files already exist locally:\n{0}\n\nDo you want to also delete the local files?",
+    "仅移除任务": "Remove Task Only",
+    "同时删除文件": "Delete Files Too",
+    "已删除本地文件": "Local file deleted",
+    "删除失败": "Delete failed",
 
     # ---- 导航 ----
     "下载历史": "Download History",

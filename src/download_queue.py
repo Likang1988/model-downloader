@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QSize
 from PySide6.QtGui import QPainter, QColor, QFont, QMouseEvent
-from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel, isDarkTheme
+from qfluentwidgets import PushButton, InfoBar, InfoBarPosition, TitleLabel, BodyLabel, CaptionLabel, TableWidget, SubtitleLabel, isDarkTheme, LineEdit
 from qfluentwidgets import FluentIcon as FIF
 from .downloader import FileInfo, DownloadTask
 from .download_history import history_mgr
@@ -179,12 +179,14 @@ class DownloadQueueWidget(QWidget):
 
         # 保存路径
         self.path_prefix = BodyLabel(tr("保存路径:"))
-        self.path_edit = ClickableLabel(self._save_path)
-        self.path_edit.setMinimumWidth(120)
-        self.path_edit.setMaximumWidth(200)
+        self.path_edit = LineEdit()
+        self.path_edit.setText(self._save_path)
+        self.path_edit.setMinimumWidth(100)
+        self.path_edit.setMaximumWidth(220)
+        self.path_edit.setReadOnly(True)
         self.path_edit.setCursor(Qt.CursorShape.PointingHandCursor)
         self.path_edit.setToolTip(tr("单击选择保存目录"))
-        self.path_edit.clicked.connect(self._on_browse_path)
+        self.path_edit.mousePressEvent = lambda e: self._on_browse_path()
         self.browse_path_btn = PushButton("📁")
         self.browse_path_btn.setFixedWidth(36)
         self.browse_path_btn.setToolTip(tr("打开保存路径"))
@@ -328,6 +330,7 @@ class DownloadQueueWidget(QWidget):
             self.path_edit.setToolTip(path)
         for row, ti in self.tasks.items():
             ti.save_path = path
+        self._save_queue()  # 立即保存路径到配置文件
 
     def set_mirror(self, enabled: bool):
         self._mirror_enabled = enabled
@@ -372,6 +375,10 @@ class DownloadQueueWidget(QWidget):
                 queue_data = json.load(f)
             if "save_path" in queue_data:
                 self._save_path = queue_data["save_path"]
+                # 立即更新 UI 显示路径
+                if hasattr(self, 'path_edit'):
+                    self.path_edit.setText(self._save_path)
+                    self.path_edit.setToolTip(self._save_path)
             if "next_row" in queue_data:
                 self._next_row = queue_data["next_row"]
             if "tasks" in queue_data:
@@ -430,9 +437,6 @@ class DownloadQueueWidget(QWidget):
                 
                 self._update_count()
                 self._update_pause_btn_text()
-                if hasattr(self, 'path_edit'):
-                    self.path_edit.setText(self._save_path)
-                    self.path_edit.setToolTip(self._save_path)
                 self.log_message.emit(tr(f"已恢复 {len(tasks)} 个任务"))
         except Exception:
             pass
@@ -636,21 +640,72 @@ class DownloadQueueWidget(QWidget):
         rows = sorted(self._get_selected_rows(), reverse=True)
         if not rows:
             return
+        
+        # 检查是否有需要删除本地文件的任务
+        tasks_to_remove = []
+        has_local_files = []
         for r in rows:
-            ti = self.tasks.pop(r, None)
+            ti = self.tasks.get(r)
             if ti:
-                if ti.task:
-                    ti.task.cancel()
-                    if ti.thread and ti.thread.isRunning():
-                        ti.thread.quit()
-                        ti.thread.wait()
-                self.table.removeRow(r)
-                # 更新后续行的 row 映射
+                tasks_to_remove.append((r, ti))
+                # 检查本地文件是否存在
+                file_path = os.path.join(ti.save_path or self._save_path, ti.file_info.repo_id, ti.file_info.path)
+                if os.path.exists(file_path):
+                    has_local_files.append((r, ti, file_path))
+        
+        delete_files = False
+        
+        # 如果有本地文件，弹出确认对话框
+        if has_local_files:
+            from PySide6.QtWidgets import QMessageBox
+            file_names = "\n".join([f"• {ti.file_info.path}" for _, ti, _ in has_local_files[:5]])
+            if len(has_local_files) > 5:
+                file_names += f"\n... 还有 {len(has_local_files) - 5} 个文件"
+            
+            msg_box = QMessageBox(self.window())
+            msg_box.setWindowTitle(tr("确认删除"))
+            msg_box.setText(tr("以下文件已存在于本地：\n{0}\n\n是否同时删除本地文件？").format(file_names))
+            msg_box.setStandardButtons(QMessageBox.No | QMessageBox.Yes | QMessageBox.Cancel)
+            msg_box.button(QMessageBox.No).setText(tr("仅移除任务"))
+            msg_box.button(QMessageBox.Yes).setText(tr("同时删除文件"))
+            msg_box.button(QMessageBox.Cancel).setText(tr("取消"))
+            msg_box.setDefaultButton(QMessageBox.No)
+            
+            result = msg_box.exec()
+            if result == QMessageBox.Cancel:
+                return
+            delete_files = (result == QMessageBox.Yes)
+        
+        # 先停止所有下载任务
+        for r, ti in tasks_to_remove:
+            if ti.task:
+                ti.task.cancel()
+            if ti.thread and ti.thread.isRunning():
+                ti.thread.quit()
+                ti.thread.wait(500)  # 等待最多500ms
+        
+        # 删除本地文件（在任务停止后）
+        if delete_files:
+            import time
+            time.sleep(0.1)  # 给文件句柄一些时间释放
+            for _, ti, file_path in has_local_files:
+                try:
+                    os.remove(file_path)
+                    self.log_message.emit(f"[{ti.file_info.repo_id}] 已删除本地文件: {ti.file_info.path}")
+                except Exception as e:
+                    self.log_message.emit(f"[{ti.file_info.repo_id}] 删除失败: {ti.file_info.path} - {str(e)}")
+        
+        # 执行移除
+        for r, ti in tasks_to_remove:
+            self.tasks.pop(r, None)
+            self.table.removeRow(r)
+        
         # 重建 tasks 的 row 索引
         self._rebuild_row_map()
         self._update_count()
         self._update_total_progress()
-        self.log_message.emit(f"已移除 {len(rows)} 个任务")
+        self._save_queue()
+        self.log_message.emit(f"已移除 {len(tasks_to_remove)} 个任务")
 
     def on_clear_all(self):
         """清空整个队列"""
@@ -855,6 +910,7 @@ class DownloadQueueWidget(QWidget):
                 ti.row = r
                 new_tasks[r] = ti
         self.tasks = new_tasks
+        self._next_row = self.table.rowCount()
 
     def _set_cell(self, row: int, col: int, text: str):
         if row < self.table.rowCount():
