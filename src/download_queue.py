@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import datetime
 from typing import Dict, Optional, List
@@ -15,6 +16,7 @@ from qfluentwidgets import FluentIcon as FIF
 from .downloader import FileInfo, DownloadTask
 from .download_history import history_mgr
 from .i18n import tr
+from .config import get_config_dir
 
 
 def format_size(size: int) -> str:
@@ -41,14 +43,23 @@ def format_eta(seconds: float) -> str:
         return f"{m:02d}:{s:02d}"
 
 
+# 下载状态常量
+STATUS_WAITING = "等待下载"
+STATUS_DOWNLOADING = "下载中"
+STATUS_PAUSED = "已暂停"
+STATUS_COMPLETED = "下载完成"
+STATUS_FAILED = "下载失败"
+STATUS_CANCELED = "已取消"
+STATUS_CONNECTING = "连接中..."
+
 # 状态颜色
 STATUS_COLORS = {
-    "等待下载": "#9E9E9E",
-    "下载中":   "#2196F3",
-    "已暂停":   "#FF9800",
-    "下载完成": "#4CAF50",
-    "下载失败": "#F44336",
-    "已取消":   "#9E9E9E",
+    STATUS_WAITING: "#9E9E9E",
+    STATUS_DOWNLOADING: "#2196F3",
+    STATUS_PAUSED: "#FF9800",
+    STATUS_COMPLETED: "#4CAF50",
+    STATUS_FAILED: "#F44336",
+    STATUS_CANCELED: "#9E9E9E",
 }
 
 COLUMNS = ["序号", "模型ID", "文件名", "来源", "状态", "进度", "已下载", "总大小", "速度", "剩余时间"]
@@ -64,7 +75,10 @@ COL_SPEED = 8
 COL_ADD_TIME = 9
 
 # 活跃下载状态（可暂停）
-ACTIVE_STATUS = ("下载中", "连接中...")
+ACTIVE_STATUS = (STATUS_DOWNLOADING, STATUS_CONNECTING)
+
+# 可重启状态（等待中、下载失败或取消后可重新开始）
+RESTARTABLE_STATUS = (STATUS_WAITING, STATUS_FAILED, STATUS_CANCELED)
 
 
 @dataclass
@@ -72,7 +86,7 @@ class TaskItem:
     """单个下载任务的数据"""
     file_info: FileInfo
     row: int = -1
-    status: str = "等待下载"
+    status: str = STATUS_WAITING
     progress: float = 0.0
     downloaded: int = 0
     speed: str = ""
@@ -137,16 +151,19 @@ class DownloadQueueWidget(QWidget):
     """下载队列组件 - 表格形式"""
     log_message = Signal(str)
 
-    def __init__(self, mirror_switch=None, parent=None):
+    def __init__(self, mirror_switch=None, provider="huggingface", parent=None):
         super().__init__(parent)
         self.mirror_switch = mirror_switch
+        self._provider = provider
         self.tasks: Dict[int, TaskItem] = {}  # row -> TaskItem
         self._next_row = 0
         self._save_path = "./models"
         self._mirror_enabled = True
         self._max_concurrent = 3
         self._active_count = 0
+        self._queue_file = os.path.join(get_config_dir(), f"queue_{provider}.json")
         self.init_ui()
+        self._load_queue()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -273,6 +290,7 @@ class DownloadQueueWidget(QWidget):
         for ti in self.tasks.values():
             if (ti.file_info.path == file_info.path
                     and ti.file_info.repo_id == file_info.repo_id):
+                self.log_message.emit(f"[{file_info.repo_id}] 已存在: {file_info.path}")
                 return
 
         row = self._next_row
@@ -289,7 +307,7 @@ class DownloadQueueWidget(QWidget):
         self.table.insertRow(row)
         self._set_cell(row, COL_INDEX, str(row + 1))
         self._set_cell(row, COL_MODEL_ID, file_info.repo_id)
-        self._set_cell(row, COL_FILENAME, file_info.name)
+        self._set_cell(row, COL_FILENAME, file_info.path)
         self._set_cell(row, COL_SOURCE,
                        "HuggingFace" if file_info.provider == "huggingface" else "ModelScope")
         self._set_cell(row, COL_STATUS, "等待下载")
@@ -297,11 +315,11 @@ class DownloadQueueWidget(QWidget):
         self._set_cell(row, COL_DOWNLOADED, "-")
         self._set_cell(row, COL_TOTAL_SIZE, format_size(file_info.size) if file_info.size else "-")
         self._set_cell(row, COL_SPEED, "-")
-        self._set_cell(row, COL_ADD_TIME, "-")
+        self._set_cell(row, COL_ADD_TIME, now_str)
 
         self.tasks[row] = item
         self._update_count()
-        self.log_message.emit(f"[{file_info.repo_id}] 已添加: {file_info.name}")
+        self.log_message.emit(f"[{file_info.repo_id}] 已添加: {file_info.path}")
 
     def set_save_path(self, path: str):
         self._save_path = path
@@ -313,6 +331,111 @@ class DownloadQueueWidget(QWidget):
 
     def set_mirror(self, enabled: bool):
         self._mirror_enabled = enabled
+
+    def _save_queue(self):
+        """保存队列到文件"""
+        try:
+            queue_data = {
+                "save_path": self._save_path,
+                "next_row": self._next_row,
+                "tasks": []
+            }
+            for row, ti in self.tasks.items():
+                if ti.status in (STATUS_WAITING, STATUS_PAUSED, STATUS_FAILED):
+                    task_data = {
+                        "row": row,
+                        "file_info": {
+                            "name": ti.file_info.name,
+                            "size": ti.file_info.size,
+                            "path": ti.file_info.path,
+                            "repo_id": ti.file_info.repo_id,
+                            "repo_type": ti.file_info.repo_type,
+                            "provider": ti.file_info.provider,
+                        },
+                        "status": ti.status,
+                        "downloaded": ti.downloaded,
+                        "save_path": ti.save_path,
+                        "add_time": ti.add_time,
+                    }
+                    queue_data["tasks"].append(task_data)
+            with open(self._queue_file, "w", encoding="utf-8") as f:
+                json.dump(queue_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _load_queue(self):
+        """从文件加载队列"""
+        if not os.path.exists(self._queue_file):
+            return
+        try:
+            with open(self._queue_file, "r", encoding="utf-8") as f:
+                queue_data = json.load(f)
+            if "save_path" in queue_data:
+                self._save_path = queue_data["save_path"]
+            if "next_row" in queue_data:
+                self._next_row = queue_data["next_row"]
+            if "tasks" in queue_data:
+                tasks = queue_data["tasks"]
+                if not tasks:
+                    return
+                
+                max_row = max(t["row"] for t in tasks) + 1
+                self.table.setRowCount(max_row)
+                
+                for task_data in tasks:
+                    fi_data = task_data.get("file_info", {})
+                    file_info = FileInfo(
+                        name=fi_data.get("name", ""),
+                        size=fi_data.get("size", 0),
+                        path=fi_data.get("path", ""),
+                        repo_id=fi_data.get("repo_id", ""),
+                        repo_type=fi_data.get("repo_type", "model"),
+                        provider=fi_data.get("provider", "huggingface"),
+                    )
+                    row = task_data.get("row", self._next_row)
+                    status = task_data.get("status", STATUS_WAITING)
+                    downloaded = task_data.get("downloaded", 0)
+                    save_path = task_data.get("save_path", self._save_path)
+                    add_time = task_data.get("add_time", "")
+                    
+                    if row >= self._next_row:
+                        self._next_row = row + 1
+                    
+                    item = TaskItem(
+                        file_info=file_info,
+                        row=row,
+                        status=status,
+                        downloaded=downloaded,
+                        save_path=save_path,
+                        add_time=add_time,
+                    )
+                    
+                    self._set_cell(row, COL_INDEX, str(row + 1))
+                    self._set_cell(row, COL_MODEL_ID, file_info.repo_id)
+                    self._set_cell(row, COL_FILENAME, file_info.path)
+                    self._set_cell(row, COL_SOURCE,
+                                   "HuggingFace" if file_info.provider == "huggingface" else "ModelScope")
+                    self._set_cell(row, COL_STATUS, status)
+                    if status == STATUS_PAUSED and downloaded > 0 and file_info.size:
+                        progress = downloaded / file_info.size * 100
+                    else:
+                        progress = 0.0
+                    self._set_progress_cell(row, progress)
+                    self._set_cell(row, COL_DOWNLOADED, format_size(downloaded) if downloaded > 0 else "-")
+                    self._set_cell(row, COL_TOTAL_SIZE, format_size(file_info.size) if file_info.size else "-")
+                    self._set_cell(row, COL_SPEED, "-")
+                    self._set_cell(row, COL_ADD_TIME, add_time)
+                    
+                    self.tasks[row] = item
+                
+                self._update_count()
+                self._update_pause_btn_text()
+                if hasattr(self, 'path_edit'):
+                    self.path_edit.setText(self._save_path)
+                    self.path_edit.setToolTip(self._save_path)
+                self.log_message.emit(tr(f"已恢复 {len(tasks)} 个任务"))
+        except Exception:
+            pass
 
     def retranslateUi(self):
         self.queue_title.setText(tr("下载队列"))
@@ -348,9 +471,18 @@ class DownloadQueueWidget(QWidget):
         """根据选中的任务状态更新暂停/继续按钮文本"""
         rows = self._get_selected_rows()
         if not rows:
-            self.pause_sel_btn.setText("暂停")
-            self.pause_sel_btn.setIcon(FIF.PAUSE)
-            self.pause_sel_btn.setEnabled(False)
+            has_active = any(t.status in ACTIVE_STATUS for t in self.tasks.values())
+            has_paused = any(t.status == "已暂停" for t in self.tasks.values())
+            if has_paused and not has_active:
+                self.pause_sel_btn.setText(tr("恢复"))
+                self.pause_sel_btn.setIcon(FIF.PLAY)
+                self.pause_sel_btn.setEnabled(True)
+            elif has_active:
+                self.pause_sel_btn.setText(tr("暂停"))
+                self.pause_sel_btn.setIcon(FIF.PAUSE)
+                self.pause_sel_btn.setEnabled(True)
+            else:
+                self.pause_sel_btn.setEnabled(False)
             return
 
         all_paused = all(
@@ -375,6 +507,44 @@ class DownloadQueueWidget(QWidget):
             self.pause_sel_btn.setIcon(FIF.PAUSE)
             self.pause_sel_btn.setEnabled(False)
 
+    def get_active_count(self):
+        """获取当前正在下载的任务数量"""
+        return sum(1 for t in self.tasks.values() if t.status in ACTIVE_STATUS)
+
+    def _shutdown(self):
+        """安全关闭所有下载任务，确保线程正确退出"""
+        # 先断开所有信号连接，防止 cancel 后触发回调
+        for ti in self.tasks.values():
+            if ti.task:
+                try:
+                    ti.task.progress_updated.disconnect()
+                    ti.task.download_completed.disconnect()
+                    ti.task.download_failed.disconnect()
+                    ti.task.download_canceled.disconnect()
+                    ti.task.download_paused.disconnect()
+                    ti.task.status_changed.disconnect()
+                except Exception:
+                    pass
+        
+        # 保存当前活跃的任务状态
+        for row, ti in self.tasks.items():
+            if ti.status in ACTIVE_STATUS:
+                ti.status = STATUS_PAUSED
+                self._set_cell(row, COL_STATUS, STATUS_PAUSED)
+        
+        # 取消并等待所有线程退出
+        for ti in self.tasks.values():
+            if ti.task:
+                ti.task.cancel()
+            if ti.thread and ti.thread.isRunning():
+                ti.thread.quit()
+                ti.thread.wait(100)  # 最多等待100ms
+        
+        # 保存队列
+        self._active_count = 0
+        self._update_pause_btn_text()
+        self._save_queue()
+
     # ========== 按钮操作 ==========
 
     def on_start_selected(self):
@@ -386,7 +556,9 @@ class DownloadQueueWidget(QWidget):
         waiting = [r for r in rows
                    if r in self.tasks and self.tasks[r].status in ("等待下载", "下载失败", "已取消")]
         paused = [r for r in rows
-                  if r in self.tasks and self.tasks[r].status == "已暂停"]
+                  if r in self.tasks and self.tasks[r].status == "已暂停" and self.tasks[r].task]
+        waiting.extend([r for r in rows
+                       if r in self.tasks and self.tasks[r].status == "已暂停" and not self.tasks[r].task])
         if not waiting and not paused:
             self.log_message.emit("没有可下载的任务")
             return
@@ -457,6 +629,7 @@ class DownloadQueueWidget(QWidget):
             # 暂停后自动启动等待中的任务填补槽位
             self._start_next_pending()
         self._update_pause_btn_text()
+        self._save_queue()
 
     def on_remove_selected(self):
         """移除选中的任务"""
@@ -578,7 +751,7 @@ class DownloadQueueWidget(QWidget):
         self._update_total_progress()
         # 写入历史记录
         history_mgr.add_record(
-            file_name=ti.file_info.name,
+            file_name=ti.file_info.path,
             repo_id=ti.file_info.repo_id,
             provider=ti.file_info.provider,
             status="下载完成",
@@ -587,6 +760,7 @@ class DownloadQueueWidget(QWidget):
         )
         # 自动启动下一个等待任务
         self._start_next_pending()
+        self._save_queue()
 
     def _on_failed(self, row: int, error: str):
         ti = self.tasks.get(row)
@@ -600,7 +774,7 @@ class DownloadQueueWidget(QWidget):
         self._update_total_progress()
         # 写入历史记录
         history_mgr.add_record(
-            file_name=ti.file_info.name,
+            file_name=ti.file_info.path,
             repo_id=ti.file_info.repo_id,
             provider=ti.file_info.provider,
             status="下载失败",
@@ -608,7 +782,8 @@ class DownloadQueueWidget(QWidget):
             save_path=ti.save_path or self._save_path,
         )
         self._start_next_pending()
-        self.log_message.emit(f"[{ti.file_info.repo_id}] 下载失败: {ti.file_info.name} - {error}")
+        self.log_message.emit(f"[{ti.file_info.repo_id}] 下载失败: {ti.file_info.path} - {error}")
+        self._save_queue()
 
     def _on_canceled(self, row: int):
         ti = self.tasks.get(row)
@@ -621,13 +796,14 @@ class DownloadQueueWidget(QWidget):
         self._active_count = max(0, self._active_count - 1)
         # 写入历史记录
         history_mgr.add_record(
-            file_name=ti.file_info.name,
+            file_name=ti.file_info.path,
             repo_id=ti.file_info.repo_id,
             provider=ti.file_info.provider,
             status="已取消",
             file_size=ti.file_info.size or 0,
             save_path=ti.save_path or self._save_path,
         )
+        self._save_queue()
 
     def _on_paused(self, row: int):
         ti = self.tasks.get(row)

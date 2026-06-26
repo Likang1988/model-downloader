@@ -34,7 +34,10 @@ _STRINGS: dict[str, str] = {
     "速度": "Speed",
     "剩余时间": "Remaining Time",
     "完成时间": "Completed Time",
-    "共 0 项": "0 items",
+    "共 {0} 项": "{0} items",
+    "确认关闭": "Confirm Close",
+    "当前有 {0} 个任务正在下载中，关闭程序将暂停所有任务。": "{0} task(s) are currently downloading. Closing the program will pause all tasks.",
+    "是否确定关闭？": "Are you sure you want to close?",
 
     # ---- 导航 ----
     "下载历史": "Download History",
@@ -88,6 +91,14 @@ _STRINGS: dict[str, str] = {
     "保存认证信息": "Save Auth Info",
     "认证信息已保存": "Auth info saved",
     "Token 已安全存储在本地配置文件中": "Token has been securely stored in the local config file",
+    "镜像与Token冲突": "Mirror and Token Conflict",
+    "检测到您已配置 HuggingFace Token，HF-Mirror 镜像不支持 Token 认证。": "HuggingFace Token detected, but HF-Mirror does not support Token authentication.",
+    "是否关闭 HF-Mirror 镜像以使用 Token 认证？": "Do you want to disable HF-Mirror to use Token authentication?",
+    "是否清空 HuggingFace Token 以使用 HF-Mirror 镜像？": "Do you want to clear HuggingFace Token to use HF-Mirror?",
+    "已关闭": "Disabled",
+    "HF-Mirror 镜像已关闭，现在可以使用 Token 认证下载私有仓库": "HF-Mirror disabled, you can now download private repos with Token authentication",
+    "已清空": "Cleared",
+    "HuggingFace Token 已清空，HF-Mirror 镜像已启用": "HuggingFace Token cleared, HF-Mirror enabled",
     "关于": "About",
     "大模型下载工具 v1.0\n\n"
     "支持从 Hugging Face 和 ModelScope 下载模型与数据集。\n"
@@ -142,6 +153,9 @@ _STRINGS: dict[str, str] = {
     "已添加 {0} 个文件到下载队列": "Added {0} file(s) to the download queue",
     "获取文件列表失败: {0}": "Failed to get file list: {0}",
     "❌ 获取文件列表失败: {0}": "❌ Failed to get file list: {0}",
+    "已添加": "Added",
+    "已将 [{0}] 添加到下载队列": "Added [{0}] to download queue",
+    "请输入模型/数据集ID": "Please enter a model/dataset ID",
 
     # ---- 文件类型 ----
     "模型文件": "Model file",
@@ -167,6 +181,15 @@ _STRINGS: dict[str, str] = {
     "已取消": "Canceled",
     "连接中...": "Connecting...",
     "总进度: %p%": "Total: %p%",
+
+    # ---- 下载队列内部消息 ----
+    "没有可下载的任务": "No tasks available for download",
+    "[{0}] 已添加: {1}": "[{0}] Added: {1}",
+    "已恢复 {0} 个任务": "Resumed {0} task(s)",
+    "已暂停 {0} 个任务": "Paused {0} task(s)",
+    "已移除 {0} 个任务": "Removed {0} task(s)",
+    "已清空下载队列": "Download queue cleared",
+    "选择保存目录": "Select Save Directory",
 }
 
 # ── 单例翻译器引用 ──

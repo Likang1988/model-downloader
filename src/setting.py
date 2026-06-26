@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
 from qfluentwidgets import (
     FluentIcon as FIF,
-    InfoBar, InfoBarPosition,
+    InfoBar, InfoBarPosition, MessageDialog,
     ComboBoxSettingCard,
     TitleLabel,
     PasswordLineEdit, ToolButton, SmoothScrollArea, LineEdit, SpinBox,
@@ -59,10 +59,36 @@ class TokenSettingCard(SettingCard):
         self.hBoxLayout.addSpacing(16)
 
     def _on_save(self):
-        cfg.set(self.config_item, self.password_edit.text().strip())
+        token = self.password_edit.text().strip()
+        cfg.set(self.config_item, token)
+        
+        if self.config_item == cfg.hf_token and token and cfg.get(cfg.mirror_enabled):
+            dialog = MessageDialog(
+                title=tr("镜像与Token冲突"),
+                content=tr("检测到您已配置 HuggingFace Token，HF-Mirror 镜像不支持 Token 认证。") + "\n\n" + tr("是否关闭 HF-Mirror 镜像以使用 Token 认证？"),
+                parent=self.window()
+            )
+            dialog.yesButton.clicked.connect(lambda: self._disable_mirror())
+            dialog.cancelButton.clicked.connect(dialog.close)
+            dialog.exec()
+        else:
+            InfoBar.success(
+                title=tr("已保存"),
+                content=tr("Token 已安全存储在本地配置文件中"),
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP_RIGHT,
+                duration=3000,
+                parent=self.window()
+            )
+    
+    def _disable_mirror(self):
+        cfg.set(cfg.mirror_enabled, False)
+        if hasattr(self.parent(), 'mirrorCard'):
+            self.parent().mirrorCard.switchButton.setChecked(False)
         InfoBar.success(
-            title=tr("已保存"),
-            content=tr("Token 已安全存储在本地配置文件中"),
+            title=tr("已关闭"),
+            content=tr("HF-Mirror 镜像已关闭，现在可以使用 Token 认证下载私有仓库"),
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP_RIGHT,
@@ -243,15 +269,12 @@ class SettingsPage(QWidget):
 
     def retranslateUi(self):
         self.settings_title.setText(tr("设置"))
-        self.appearanceGroup.setTitle(tr("外观"))
-        self.downloadGroup.setTitle(tr("下载设置"))
         self.mirrorCard.setTitle(tr("使用 HF-Mirror 镜像"))
         self.mirrorCard.setContent(tr("国内加速访问 Hugging Face"))
         self.speedLimitCard.setTitle(tr("下载速度限制"))
         self.speedLimitCard.setContent(tr("0 表示不限制，单位 MB/s"))
         self.concurrencyCard.setTitle(tr("并发下载数量"))
         self.concurrencyCard.setContent(tr("同时下载的文件数量"))
-        self.authGroup.setTitle(tr("认证"))
         self.hfTokenCard.setTitle(tr("HuggingFace Token"))
         self.hfTokenCard.setContent(tr("私有仓库需要认证"))
         self.msTokenCard.setTitle(tr("ModelScope Token"))
@@ -260,7 +283,6 @@ class SettingsPage(QWidget):
         self.tokenLinksCard.setContent(tr("前往对应平台获取访问令牌"))
         self.tokenLinksCard.hf_link.setText(tr("HuggingFace"))
         self.tokenLinksCard.ms_link.setText(tr("ModelScope"))
-        self.aboutGroup.setTitle(tr("关于"))
         self.aboutCard.setTitle(tr("关于"))
         self.aboutCard.setContent(tr("大模型下载工具 v1.0"))
 
@@ -284,4 +306,31 @@ class SettingsPage(QWidget):
             self._main_window.retranslateAll()
 
     def _on_mirror_changed(self, checked):
-        cfg.set(cfg.mirror_enabled, checked)
+        if checked and cfg.get(cfg.hf_token):
+            dialog = MessageDialog(
+                title=tr("镜像与Token冲突"),
+                content=tr("检测到您已配置 HuggingFace Token，HF-Mirror 镜像不支持 Token 认证。") + "\n\n" + tr("是否清空 HuggingFace Token 以使用 HF-Mirror 镜像？"),
+                parent=self.window()
+            )
+            dialog.yesButton.clicked.connect(lambda: self._clear_hf_token())
+            dialog.cancelButton.clicked.connect(lambda: self._cancel_mirror_switch())
+            dialog.exec()
+        else:
+            cfg.set(cfg.mirror_enabled, checked)
+    
+    def _clear_hf_token(self):
+        cfg.set(cfg.hf_token, "")
+        self.hfTokenCard.password_edit.clear()
+        cfg.set(cfg.mirror_enabled, True)
+        InfoBar.success(
+            title=tr("已清空"),
+            content=tr("HuggingFace Token 已清空，HF-Mirror 镜像已启用"),
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP_RIGHT,
+            duration=3000,
+            parent=self
+        )
+    
+    def _cancel_mirror_switch(self):
+        self.mirrorCard.switchButton.setChecked(False)

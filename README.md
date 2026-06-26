@@ -2,7 +2,6 @@
 
 <p align="center">
 
-
 <p align="center"><img width="15%" align="center" src="src\icon\HuggingScope.png" alt="logo">
 
 一款基于 PySide6 + QFluentWidgets 构建的桌面大模型下载工具，支持从 Hugging Face 和 ModelScope 下载模型与数据集。

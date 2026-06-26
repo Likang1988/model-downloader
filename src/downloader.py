@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import urllib3
 from typing import List, Dict, Optional
@@ -28,6 +29,16 @@ def get_auth_headers(provider: str) -> dict:
         if token:
             headers["Authorization"] = f"Bearer {token}"
     return headers
+
+
+# 从 download_queue 导入状态常量，避免硬编码
+def _get_status_connecting():
+    from .download_queue import STATUS_CONNECTING
+    return STATUS_CONNECTING
+
+def _get_status_downloading():
+    from .download_queue import STATUS_DOWNLOADING
+    return STATUS_DOWNLOADING
 
 
 class FileInfo:
@@ -67,6 +78,10 @@ class DownloadTask(QObject):
         path = self.file_info.path
 
         if provider == "huggingface":
+            from .config import cfg
+            token = cfg.get(cfg.hf_token) or ""
+            if token and self.mirror_enabled:
+                return f"https://huggingface.co/{repo_id}/resolve/main/{path}"
             base = "https://hf-mirror.com" if self.mirror_enabled else "https://huggingface.co"
             return f"{base}/{repo_id}/resolve/main/{path}"
         elif provider == "modelscope":
@@ -76,42 +91,96 @@ class DownloadTask(QObject):
     def run(self):
         url = self.get_download_url()
         if not url:
-            self.download_failed.emit(self.task_id, "无效的下载URL")
+            self._safe_emit_failed("无效的下载URL")
             return
 
         try:
-            self.status_changed.emit(self.task_id, "连接中...")
+            self._safe_emit_status_changed(_get_status_connecting())
             headers = get_auth_headers(self.file_info.provider)
+            
+            file_path = os.path.join(self.save_path, self.file_info.repo_id, self.file_info.path)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            resume_size = 0
+            if os.path.exists(file_path):
+                resume_size = os.path.getsize(file_path)
+            
+            if resume_size > 0:
+                headers["Range"] = f"bytes={resume_size}-"
+            
             response = requests.get(url, stream=True, timeout=30, headers=headers)
             response.raise_for_status()
 
             total_size = int(response.headers.get("content-length", 0)) or 0
+            if resume_size > 0:
+                content_range = response.headers.get("content-range", "")
+                if content_range:
+                    match = re.search(r"/(\d+)$", content_range)
+                    if match:
+                        total_size = int(match.group(1))
+                else:
+                    total_size += resume_size
+            
             self.total_size = total_size
-            self.current_size = 0
-            self.status_changed.emit(self.task_id, "下载中")
+            self.current_size = resume_size
+            self._safe_emit_status_changed(_get_status_downloading())
 
-            file_path = os.path.join(self.save_path, self.file_info.repo_id, self.file_info.path)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-            with open(file_path, "wb") as f:
+            mode = "ab" if resume_size > 0 else "wb"
+            with open(file_path, mode) as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if self.canceled:
                         self._cleanup_file()
-                        self.download_canceled.emit(self.task_id)
+                        self._safe_emit_canceled()
                         return
 
                     if self._paused:
-                        self.download_paused.emit(self.task_id)
+                        self._safe_emit_paused()
                         self._wait_for_resume()
 
                     if chunk:
                         f.write(chunk)
                         self.current_size += len(chunk)
-                        self.progress_updated.emit(self.task_id, self.current_size, total_size)
+                        self._safe_emit_progress(self.current_size, total_size)
 
-            self.download_completed.emit(self.task_id)
+            self._safe_emit_completed()
         except Exception as e:
-            self.download_failed.emit(self.task_id, str(e))
+            self._safe_emit_failed(str(e))
+
+    def _safe_emit_progress(self, current, total):
+        try:
+            self.progress_updated.emit(self.task_id, current, total)
+        except RuntimeError:
+            pass
+
+    def _safe_emit_status_changed(self, status):
+        try:
+            self.status_changed.emit(self.task_id, status)
+        except RuntimeError:
+            pass
+
+    def _safe_emit_completed(self):
+        try:
+            self.download_completed.emit(self.task_id)
+        except RuntimeError:
+            pass
+
+    def _safe_emit_failed(self, error):
+        try:
+            self.download_failed.emit(self.task_id, error)
+        except RuntimeError:
+            pass
+
+    def _safe_emit_canceled(self):
+        try:
+            self.download_canceled.emit(self.task_id)
+        except RuntimeError:
+            pass
+
+    def _safe_emit_paused(self):
+        try:
+            self.download_paused.emit(self.task_id)
+        except RuntimeError:
+            pass
 
     def _cleanup_file(self):
         """删除未完成的下载文件"""

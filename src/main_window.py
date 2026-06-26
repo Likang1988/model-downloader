@@ -38,7 +38,7 @@ class RepoPage(QWidget):
         super().__init__(parent)
         self.provider = provider
         self.mirror_switch = mirror_switch
-        self.download_queue = DownloadQueueWidget(mirror_switch)
+        self.download_queue = DownloadQueueWidget(mirror_switch, provider)
         self.init_ui()
 
         # 连接日志信号
@@ -198,6 +198,27 @@ class MainWindow(FluentWindow):
         
         # 监听主题变化（按照官方示例的方式）
         cfg.themeChanged.connect(setTheme)
+
+    def closeEvent(self, event):
+        active_count = 0
+        active_count += self.hf_page.download_queue.get_active_count()
+        active_count += self.ms_page.download_queue.get_active_count()
+        
+        if active_count > 0:
+            from qfluentwidgets import MessageDialog
+            dialog = MessageDialog(
+                title=tr("确认关闭"),
+                content=tr(f"当前有 {active_count} 个任务正在下载中，关闭程序将暂停所有任务。") + "\n\n" + tr("是否确定关闭？"),
+                parent=self
+            )
+            if not dialog.exec():
+                event.ignore()
+                return
+        
+        self.hf_page.download_queue._shutdown()
+        self.ms_page.download_queue._shutdown()
+        
+        event.accept()
 
     def retranslateAll(self):
         """所有页面重新翻译 — 语言切换时调用"""

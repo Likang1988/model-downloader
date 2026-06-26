@@ -33,6 +33,12 @@ def format_size(size: int) -> str:
         return f"{size / (1024 * 1024 * 1024):.2f} GB"
 
 
+# 下载状态常量（与 download_queue.py 保持一致）
+HIST_STATUS_COMPLETED = "下载完成"
+HIST_STATUS_FAILED = "下载失败"
+HIST_STATUS_CANCELED = "已取消"
+HIST_FILTER_ALL = "全部"
+
 # 列定义
 HIST_COLUMNS = ["序号", "文件名", "模型ID", "来源", "状态", "大小", "完成时间", "保存路径"]
 HIST_IDX = 0
@@ -49,9 +55,9 @@ class HistoryDelegate(QStyledItemDelegate):
     """状态列自定义颜色绘制"""
 
     STATUS_COLORS = {
-        "下载完成": "#4CAF50",
-        "下载失败": "#F44336",
-        "已取消": "#9E9E9E",
+        HIST_STATUS_COMPLETED: "#4CAF50",
+        HIST_STATUS_FAILED: "#F44336",
+        HIST_STATUS_CANCELED: "#9E9E9E",
         "部分完成": "#FF9800",
     }
 
@@ -163,7 +169,7 @@ class HistoryPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._current_filter = "全部"
+        self._current_filter = HIST_FILTER_ALL
         self._history_mgr = history_mgr
         self._history_mgr._save()  # 确保文件已初始化
         self.init_ui()
@@ -175,7 +181,7 @@ class HistoryPage(QWidget):
 
         # 标题栏
         header = QHBoxLayout()
-        self._title_label = SubtitleLabel("下载历史")
+        self._title_label = SubtitleLabel(tr("下载历史"))
         header.addWidget(self._title_label)
 
         # 统计标签
@@ -186,7 +192,7 @@ class HistoryPage(QWidget):
         # 清空历史按钮
         self.clear_btn = ToolButton(FIF.BROOM)
         self.clear_btn.setFixedSize(36, 36)
-        self.clear_btn.setToolTip("清空全部历史")
+        self.clear_btn.setToolTip(tr("清空全部历史"))
         self.clear_btn.clicked.connect(self._on_clear_all)
         header.addWidget(self.clear_btn)
 
@@ -199,9 +205,9 @@ class HistoryPage(QWidget):
         self.filter_failed = PushButton(tr("下载失败"))
         self.filter_all.setChecked(True)
 
-        self.filter_all.clicked.connect(lambda: self._set_filter("全部"))
-        self.filter_success.clicked.connect(lambda: self._set_filter("下载完成"))
-        self.filter_failed.clicked.connect(lambda: self._set_filter("下载失败"))
+        self.filter_all.clicked.connect(lambda: self._set_filter(HIST_FILTER_ALL))
+        self.filter_success.clicked.connect(lambda: self._set_filter(HIST_STATUS_COMPLETED))
+        self.filter_failed.clicked.connect(lambda: self._set_filter(HIST_STATUS_FAILED))
 
         filter_layout.addWidget(self.filter_all)
         filter_layout.addWidget(self.filter_success)
@@ -289,8 +295,8 @@ class HistoryPage(QWidget):
         # 更新统计
         all_records = self._history_mgr.get_records()
         total = len(all_records)
-        success = len([r for r in all_records if r.get("status") == "下载完成"])
-        failed = len([r for r in all_records if r.get("status") in ("下载失败", "已取消")])
+        success = len([r for r in all_records if r.get("status") == HIST_STATUS_COMPLETED])
+        failed = len([r for r in all_records if r.get("status") in (HIST_STATUS_FAILED, HIST_STATUS_CANCELED)])
         self._count_label.setText(
             f"{tr('全部')} {total} | {tr('完成')} {success} | {tr('失败')} {failed}"
         )
@@ -352,7 +358,7 @@ class HistoryPage(QWidget):
         records = self._get_selected_records()
         if not records:
             InfoBar.warning(
-                title="提示", content="请先选择一条历史记录",
+                title=tr("提示"), content=tr("请先选择一条历史记录"),
                 orient=Qt.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
             )
@@ -371,7 +377,7 @@ class HistoryPage(QWidget):
                     opened += 1
         if opened == 0:
             InfoBar.warning(
-                title="提示", content="文件路径不存在",
+                title=tr("提示"), content=tr("文件路径不存在"),
                 orient=Qt.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
             )
@@ -380,7 +386,7 @@ class HistoryPage(QWidget):
         records = self._get_selected_records()
         if not records:
             InfoBar.warning(
-                title="提示", content="请先选择要重新下载的记录",
+                title=tr("提示"), content=tr("请先选择要重新下载的记录"),
                 orient=Qt.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
             )
@@ -388,7 +394,7 @@ class HistoryPage(QWidget):
         for rec in records:
             self.record_double_clicked.emit(rec)
         InfoBar.success(
-            title="已添加", content=f"已将 {len(records)} 个文件添加到下载队列",
+            title=tr("已添加"), content=tr("已将 {0} 个文件添加到下载队列").format(len(records)),
             orient=Qt.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
         )
@@ -397,14 +403,14 @@ class HistoryPage(QWidget):
         records = self._get_selected_records()
         if not records:
             InfoBar.warning(
-                title="提示", content="请先选择要删除的记录",
+                title=tr("提示"), content=tr("请先选择要删除的记录"),
                 orient=Qt.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
             )
             return
         dialog = MessageDialog(
-            title="确认删除",
-            content=f"确定要删除选中的 {len(records)} 条历史记录吗？",
+            title=tr("确认删除"),
+            content=tr("确定要删除选中的 {0} 条历史记录吗？").format(len(records)),
             parent=self
         )
         dialog.yesButton.clicked.connect(lambda: self._do_delete(records))
@@ -419,14 +425,14 @@ class HistoryPage(QWidget):
     def _on_clear_all(self):
         if not self._history_mgr.get_records():
             InfoBar.warning(
-                title="提示", content="暂无历史记录",
+                title=tr("提示"), content=tr("暂无历史记录"),
                 orient=Qt.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP_RIGHT, duration=3000, parent=self
             )
             return
         dialog = MessageDialog(
-            title="清空历史",
-            content="确定要清空全部下载历史吗？此操作不可恢复。",
+            title=tr("清空历史"),
+            content=tr("确定要清空全部下载历史吗？此操作不可恢复。"),
             parent=self
         )
         dialog.yesButton.clicked.connect(lambda: self._do_clear_all())
